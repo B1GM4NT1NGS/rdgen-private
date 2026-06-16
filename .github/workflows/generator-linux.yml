@@ -1,4 +1,4 @@
-name: Custom Linux Client Generator
+﻿name: Custom Linux Client Generator
 run-name: Custom Linux Client Generator
 on: 
   workflow_dispatch:
@@ -264,9 +264,9 @@ jobs:
           command: |
             sed -i -e 's|rs-ny.rustdesk.com|${{ env.server }}|' ./libs/hbb_common/src/config.rs
             sed -i -e 's|OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=|${{ env.key }}|' ./libs/hbb_common/src/config.rs
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allowCustom.py
+            curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/allowCustom.py?ref=${{ github.ref_name }}" -o allowCustom.py
             python allowCustom.py
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/removeSetupServerTip.diff
+            curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/removeSetupServerTip.diff?ref=${{ github.ref_name }}" -o removeSetupServerTip.diff
             git apply removeSetupServerTip.diff
             echo -n "${{ env.custom }}" | cat > ./custom_.txt
             # sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
@@ -309,7 +309,7 @@ jobs:
           max_attempts: 3
           shell: bash
           command: |
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/cycle_monitor.diff
+            curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/cycle_monitor.diff?ref=${{ github.ref_name }}" -o cycle_monitor.diff
             git apply cycle_monitor.diff
 
       - name: use X for offline display instead of orange circle
@@ -320,7 +320,7 @@ jobs:
           max_attempts: 3
           shell: bash
           command: |
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff
+            curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/xoffline.diff?ref=${{ github.ref_name }}" -o xoffline.diff
             git apply xoffline.diff
 
       - name: hide-cm
@@ -331,7 +331,7 @@ jobs:
           max_attempts: 3
           shell: bash
           command: |
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/hidecm.diff
+            curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/hidecm.diff?ref=${{ github.ref_name }}" -o hidecm.diff
             git apply hidecm.diff
         
       - name: removeNewVersionNotif

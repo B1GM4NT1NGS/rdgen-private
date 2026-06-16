@@ -18,6 +18,24 @@ from .models import GithubRun
 from PIL import Image
 from urllib.parse import quote
 
+def env_default(name, fallback=""):
+    return (os.environ.get(name) or fallback or "").strip()
+
+def safe_app_name(value=""):
+    appname = str(value or env_default('RDGEN_DEFAULT_APP_NAME', 'BackupIT')).strip()
+    if not appname or appname.lower() == "rustdesk":
+        return "BackupIT"
+    return appname
+
+def safe_filename(value=""):
+    filename = str(value or env_default('RDGEN_DEFAULT_FILE_NAME', 'BackupIT')).strip()
+    if not filename or filename.lower() == "rustdesk":
+        filename = "BackupIT"
+    if all(char.isascii() for char in filename):
+        filename = re.sub(r'[^\w\s-]', '_', filename).strip().replace(" ", "_")
+        return filename or "BackupIT"
+    return env_default('RDGEN_DEFAULT_FILE_NAME', 'BackupIT')
+
 def github_error_response(response):
     try:
         payload = response.json()
@@ -56,25 +74,23 @@ def generator_view(request):
             urlLink = form.cleaned_data['urlLink']
             downloadLink = form.cleaned_data['downloadLink']
             if not server:
-                server = 'rs-ny.rustdesk.com' #default rustdesk server
+                server = env_default('RDGEN_DEFAULT_SERVER', 'server.v22.online')
             if not key:
-                key = 'OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=' #default rustdesk key
+                key = env_default('RDGEN_DEFAULT_KEY', '')
             if not apiServer:
-                apiServer = server+":21114"
+                apiServer = env_default('RDGEN_DEFAULT_API_SERVER', server + ":21114")
             if not urlLink:
-                urlLink = "https://rustdesk.com"
+                urlLink = env_default('RDGEN_DEFAULT_URL_LINK', "https://www.backupit.co.uk")
             if not downloadLink:
-                downloadLink = "https://rustdesk.com/download"
+                downloadLink = env_default('RDGEN_DEFAULT_DOWNLOAD_LINK', "https://www.backupit.co.uk")
             direction = form.cleaned_data['direction']
             installation = form.cleaned_data['installation']
             settings = form.cleaned_data['settings']
-            appname = (form.cleaned_data['appname'] or os.environ.get('RDGEN_DEFAULT_APP_NAME') or "BackupIT").strip()
-            if not appname or appname.lower() == "rustdesk":
-                appname = "BackupIT"
-            filename = form.cleaned_data['exename']
+            appname = safe_app_name(form.cleaned_data['appname'])
+            filename = safe_filename(form.cleaned_data['exename'])
             compname = form.cleaned_data['compname']
             if not compname:
-                compname = "Purslane Ltd"
+                compname = env_default('RDGEN_DEFAULT_COMPANY', 'Backup IT')
             androidappid = form.cleaned_data['androidappid']
             if not androidappid:
                 androidappid = "com.carriez.flutter_hbb"
@@ -106,13 +122,8 @@ def generator_view(request):
             enableCamera = form.cleaned_data['enableCamera']
             enableTerminal = form.cleaned_data['enableTerminal']
 
-            if all(char.isascii() for char in filename):
-                filename = re.sub(r'[^\w\s-]', '_', filename).strip()
-                filename = filename.replace(" ","_")
-            else:
-                filename = os.environ.get('RDGEN_DEFAULT_FILE_NAME') or "BackupIT"
             if not all(char.isascii() for char in appname):
-                appname = os.environ.get('RDGEN_DEFAULT_APP_NAME') or "BackupIT"
+                appname = env_default('RDGEN_DEFAULT_APP_NAME', 'BackupIT')
             myuuid = str(uuid.uuid4())
             protocol = _settings.PROTOCOL
             host = request.get_host()
@@ -499,16 +510,16 @@ def startgh(request):
     data = {
         "ref": _settings.GHBRANCH,
         "inputs":{
-            "server":data_.get('server'),
-            "key":data_.get('key'),
-            "apiServer":data_.get('apiServer'),
+            "server":data_.get('server') or env_default('RDGEN_DEFAULT_SERVER', 'server.v22.online'),
+            "key":data_.get('key') or env_default('RDGEN_DEFAULT_KEY', ''),
+            "apiServer":data_.get('apiServer') or env_default('RDGEN_DEFAULT_API_SERVER', 'server.v22.online:21114'),
             "custom":data_.get('custom'),
             "uuid":data_.get('uuid'),
             "iconlink":data_.get('iconlink'),
             "logolink":data_.get('logolink'),
-            "appname":data_.get('appname'),
+            "appname":safe_app_name(data_.get('appname')),
             "extras":data_.get('extras'),
-            "filename":data_.get('filename')
+            "filename":safe_filename(data_.get('filename'))
         }
     } 
     headers = {

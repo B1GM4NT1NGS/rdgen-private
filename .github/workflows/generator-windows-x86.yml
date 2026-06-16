@@ -1,4 +1,4 @@
-name: Custom Windows x86 Client Generator
+﻿name: Custom Windows x86 Client Generator
 run-name: Custom Windows x86 Client Generator
 on: 
   workflow_dispatch:
@@ -216,7 +216,7 @@ jobs:
           shell: pwsh
           continue_on_error: true
           command: |
-            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allowCustom.diff -OutFile allowCustom.diff
+            Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/allowCustom.diff?ref=${{ github.ref_name }}" -OutFile allowCustom.diff
             git apply allowCustom.diff
 
       - name: Install LLVM and Clang
