@@ -1,11 +1,54 @@
 from django import forms
 from PIL import Image
+from django.conf import settings
+import json
+import os
+
+
+FALLBACK_VERSION_CHOICES = [
+    ('master', 'nightly'),
+    ('1.4.7', '1.4.7'),
+    ('1.4.6', '1.4.6'),
+    ('1.4.5', '1.4.5'),
+    ('1.4.4', '1.4.4'),
+    ('1.4.3', '1.4.3'),
+    ('1.4.2', '1.4.2'),
+    ('1.4.1', '1.4.1'),
+    ('1.4.0', '1.4.0'),
+    ('1.3.9', '1.3.9'),
+    ('1.3.8', '1.3.8'),
+    ('1.3.7', '1.3.7'),
+    ('1.3.6', '1.3.6'),
+    ('1.3.5', '1.3.5'),
+    ('1.3.4', '1.3.4'),
+    ('1.3.3', '1.3.3'),
+]
+
+
+def rustdesk_version_choices():
+    path = getattr(settings, 'RDGEN_VERSION_FILE', '') or ''
+    choices = [('master', 'nightly')]
+    try:
+        with open(path, 'r', encoding='utf-8') as fh:
+            data = json.load(fh)
+        for version in data.get('versions', []):
+            version = str(version).strip()
+            if version and version != 'master':
+                choices.append((version, version))
+    except Exception:
+        return FALLBACK_VERSION_CHOICES
+    return choices if len(choices) > 1 else FALLBACK_VERSION_CHOICES
+
+
+def default_version():
+    choices = rustdesk_version_choices()
+    return choices[1][0] if len(choices) > 1 else '1.4.7'
 
 class GenerateForm(forms.Form):
     sh_secret_field = forms.CharField(required=False)
     #Platform
     platform = forms.ChoiceField(choices=[('windows','Windows 64Bit'),('windows-x86','Windows 32Bit'),('linux','Linux'),('android','Android'),('macos','macOS')], initial='windows')
-    version = forms.ChoiceField(choices=[('master','nightly'),('1.4.7','1.4.7'),('1.4.6','1.4.6'),('1.4.5','1.4.5'),('1.4.4','1.4.4'),('1.4.3','1.4.3'),('1.4.2','1.4.2'),('1.4.1','1.4.1'),('1.4.0','1.4.0'),('1.3.9','1.3.9'),('1.3.8','1.3.8'),('1.3.7','1.3.7'),('1.3.6','1.3.6'),('1.3.5','1.3.5'),('1.3.4','1.3.4'),('1.3.3','1.3.3')], initial='1.4.7')
+    version = forms.ChoiceField(choices=FALLBACK_VERSION_CHOICES, initial='1.4.7')
     help_text="'master' is the development version (nightly build) with the latest features but may be less stable"
     delayFix = forms.BooleanField(initial=True, required=False)
 
@@ -85,6 +128,20 @@ class GenerateForm(forms.Form):
     cycleMonitor = forms.BooleanField(initial=False, required=False)
     xOffline = forms.BooleanField(initial=False, required=False)
     removeNewVersionNotif = forms.BooleanField(initial=False, required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        version_choices = rustdesk_version_choices()
+        self.fields['version'].choices = version_choices
+        self.fields['version'].initial = default_version()
+        self.fields['serverIP'].initial = os.environ.get('RDGEN_DEFAULT_SERVER', '')
+        self.fields['apiServer'].initial = os.environ.get('RDGEN_DEFAULT_API_SERVER', '')
+        self.fields['key'].initial = os.environ.get('RDGEN_DEFAULT_KEY', '')
+        self.fields['urlLink'].initial = os.environ.get('RDGEN_DEFAULT_URL_LINK', '')
+        self.fields['downloadLink'].initial = os.environ.get('RDGEN_DEFAULT_DOWNLOAD_LINK', '')
+        self.fields['compname'].initial = os.environ.get('RDGEN_DEFAULT_COMPANY', '')
+        self.fields['appname'].initial = os.environ.get('RDGEN_DEFAULT_APP_NAME', '')
+        self.fields['exename'].initial = os.environ.get('RDGEN_DEFAULT_FILE_NAME', '')
 
     def clean_iconfile(self):
         print("checking icon")

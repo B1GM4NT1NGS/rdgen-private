@@ -68,9 +68,9 @@ def generator_view(request):
             direction = form.cleaned_data['direction']
             installation = form.cleaned_data['installation']
             settings = form.cleaned_data['settings']
-            appname = form.cleaned_data['appname']
-            if not appname:
-                appname = "rustdesk"
+            appname = (form.cleaned_data['appname'] or os.environ.get('RDGEN_DEFAULT_APP_NAME') or "BackupIT").strip()
+            if not appname or appname.lower() == "rustdesk":
+                appname = "BackupIT"
             filename = form.cleaned_data['exename']
             compname = form.cleaned_data['compname']
             if not compname:
@@ -110,9 +110,9 @@ def generator_view(request):
                 filename = re.sub(r'[^\w\s-]', '_', filename).strip()
                 filename = filename.replace(" ","_")
             else:
-                filename = "rustdesk"
+                filename = os.environ.get('RDGEN_DEFAULT_FILE_NAME') or "BackupIT"
             if not all(char.isascii() for char in appname):
-                appname = "rustdesk"
+                appname = os.environ.get('RDGEN_DEFAULT_APP_NAME') or "BackupIT"
             myuuid = str(uuid.uuid4())
             protocol = _settings.PROTOCOL
             host = request.get_host()
@@ -156,7 +156,7 @@ def generator_view(request):
                 decodedCustom['disable-installation'] = 'Y'
             if settings == "settingsN":
                 decodedCustom['disable-settings'] = 'Y'
-            if appname.upper != "rustdesk".upper and appname != "":
+            if appname and appname.lower() != "rustdesk":
                 decodedCustom['app-name'] = appname
             decodedCustom['override-settings'] = {}
             decodedCustom['default-settings'] = {}
