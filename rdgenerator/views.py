@@ -18,6 +18,22 @@ from .models import GithubRun
 from PIL import Image
 from urllib.parse import quote
 
+def github_error_response(response):
+    try:
+        payload = response.json()
+    except Exception:
+        payload = {}
+    message = payload.get("message") if isinstance(payload, dict) else ""
+    errors = payload.get("errors") if isinstance(payload, dict) else None
+    detail = message or response.text[:500] or "GitHub rejected the start request"
+    if errors:
+        detail = f"{detail}: {errors}"
+    return JsonResponse({
+        "error": "GitHub rejected the start request",
+        "github_status": response.status_code,
+        "github_message": detail,
+    }, status=500)
+
 def generator_view(request):
     if request.method == 'POST':
         form = GenerateForm(request.POST, request.FILES)
@@ -100,7 +116,7 @@ def generator_view(request):
             myuuid = str(uuid.uuid4())
             protocol = _settings.PROTOCOL
             host = request.get_host()
-            full_url = f"{protocol}://{host}"
+            full_url = (_settings.GENURL or "").rstrip("/") or f"{protocol}://{host}"
             try:
                 iconfile = form.cleaned_data.get('iconfile')
                 if not iconfile:
@@ -302,8 +318,7 @@ def generator_view(request):
                 "inputs":{
                     "version":version,
                     "zip_url":zip_url
-                },
-                "return_run_details": True
+                }
             } 
             #print(data)
             headers = {
@@ -320,16 +335,21 @@ def generator_view(request):
                 response = requests.post(url, json=data, headers=headers)
                 #print(response)
                 if response.status_code == 204 or response.status_code == 200:
-                    github_data = response.json()
+                    try:
+                        github_data = response.json() if response.content else {}
+                    except Exception:
+                        github_data = {}
                     print(github_data)
                     new_github_run.github_run_id = github_data.get('workflow_run_id')
                     new_github_run.status = "in_progress"
                     new_github_run.save()
 
-                    return render(request, 'waiting.html', {'filename':filename, 'uuid':myuuid, 'status':"Starting generator...please wait", 'platform':platform, 'log_url': github_data.get('html_url')})
+                    workflow_file = url.split('/workflows/', 1)[1].split('/dispatches', 1)[0]
+                    log_url = github_data.get('html_url') or f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions/workflows/{workflow_file}"
+                    return render(request, 'waiting.html', {'filename':filename, 'uuid':myuuid, 'status':"Starting generator...please wait", 'platform':platform, 'log_url': log_url})
                 else:
                     #new_github_run.delete()
-                    return JsonResponse({"error": "GitHub rejected the start request"}, status=500)
+                    return github_error_response(response)
             except Exception as e:
                 #new_github_run.delete()
                 return JsonResponse({"error": f"Connection error: {str(e)}"}, status=500)
