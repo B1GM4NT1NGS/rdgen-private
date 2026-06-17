@@ -38,6 +38,10 @@ env:
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
   UPLOAD_ARTIFACT: 'true'
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
+  SIGN_API_KEY: "${{ secrets.SIGN_API_KEY }}"
+  SIGN_TIMESTAMP_URL: "${{ secrets.SIGN_TIMESTAMP_URL }}"
+  WINDOWS_PFX_BASE64: "${{ secrets.WINDOWS_PFX_BASE64 }}"
+  WINDOWS_PFX_PASSWORD: "${{ secrets.WINDOWS_PFX_PASSWORD }}"
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
 
@@ -512,17 +516,9 @@ jobs:
 
       - name: sign dlls
         continue-on-error: true
-        shell: bash
+        shell: pwsh
         run: |
-          if [ ! -z "${{ secrets.SIGN_BASE_URL }}" ] && [ ! -z "${{ secrets.SIGN_API_KEY }}" ]; then
-            curl -X POST -F "file=@./rustdesk/unsigned_files.zip" \
-              -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" \
-              -m 900 \
-              "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./rustdesk/signed_files.zip
-          else
-            echo "Signing skipped - signing URL or API key not configured"
-            cp ./rustdesk/unsigned_files.zip ./rustdesk/signed_files.zip
-          fi
+          .\.github\scripts\sign_windows_archive.ps1 -InputZip ./rustdesk/unsigned_files.zip -OutputZip ./rustdesk/signed_files.zip
 
       - name: unzip dlls
         continue-on-error: true
@@ -575,17 +571,9 @@ jobs:
 
       - name: sign exe and msi
         continue-on-error: true
-        shell: bash
+        shell: pwsh
         run: |
-          if [ ! -z "${{ secrets.SIGN_BASE_URL }}" ] && [ ! -z "${{ secrets.SIGN_API_KEY }}" ]; then
-            curl -X POST -F "file=@./SignOutput/unsigned_files.zip" \
-              -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" \
-              -m 900 \
-              "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./SignOutput/signed_files.zip
-          else
-            echo "Signing skipped - signing URL or API key not configured"
-            cp ./SignOutput/unsigned_files.zip ./SignOutput/signed_files.zip
-          fi
+          .\.github\scripts\sign_windows_archive.ps1 -InputZip ./SignOutput/unsigned_files.zip -OutputZip ./SignOutput/signed_files.zip
 
       - name: unzip exe and msi
         continue-on-error: true
