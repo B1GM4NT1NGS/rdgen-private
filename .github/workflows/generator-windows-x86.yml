@@ -173,6 +173,11 @@ jobs:
           sed -i -e 's|{subkey}|\\\"{subkey}\\\"|' ./src/platform/windows.rs
           sed -i -e 's|reg delete HKEY_CLASSES_ROOT\\\\.{ext} /f|reg delete \\\"HKEY_CLASSES_ROOT\\\\.{ext}\\\" /f|' ./src/platform/windows.rs
           sed -i -e 's|reg delete HKEY_CLASSES_ROOT\\\\{ext} /f|reg delete \\\"HKEY_CLASSES_ROOT\\\\{ext}\\\" /f|' ./src/platform/windows.rs
+          sed -i -e 's|taskkill /F /IM {app_name}.exe|taskkill /F /IM \\\"{app_name}.exe\\\"|g' ./src/platform/windows.rs
+          sed -i -e 's|sc stop {app_name}|sc stop \\\"{app_name}\\\"|g' ./src/platform/windows.rs
+          sed -i -e 's|sc delete {app_name}|sc delete \\\"{app_name}\\\"|g' ./src/platform/windows.rs
+          sed -i -e 's|sc create {app_name} binpath=|sc create \\\"{app_name}\\\" binpath=|g' ./src/platform/windows.rs
+          sed -i -e 's|sc start {app_name}|sc start \\\"{app_name}\\\"|g' ./src/platform/windows.rs
           
       - name: change company name
         if: env.compname != 'Purslane Ltd'
