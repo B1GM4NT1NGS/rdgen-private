@@ -48,6 +48,7 @@ class GenerateForm(forms.Form):
     sh_secret_field = forms.CharField(required=False)
     #Platform
     platform = forms.ChoiceField(choices=[('windows','Windows 64Bit'),('windows-x86','Windows 32Bit'),('linux','Linux'),('android','Android'),('macos','macOS')], initial='windows')
+    build_mode = forms.ChoiceField(choices=[('github','GitHub hosted'),('local','Docker local runner')], initial='github', required=False)
     version = forms.ChoiceField(choices=FALLBACK_VERSION_CHOICES, initial='1.4.7')
     help_text="'master' is the development version (nightly build) with the latest features but may be less stable"
     delayFix = forms.BooleanField(initial=True, required=False)
