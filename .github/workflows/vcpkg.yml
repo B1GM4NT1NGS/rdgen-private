@@ -8,6 +8,9 @@ on:
         required: false
         default: 'Manual dependency update'
 
+permissions:
+  contents: read
+
 env:
   VCPKG_COMMIT_ID: '120deac3062162151622ca4860575a33844ba10b'
 
@@ -65,3 +68,4 @@ jobs:
           name: vcpkg-export-${{ matrix.job.vcpkg-triplet }}
           path: ${{ github.workspace }}/installed/
           if-no-files-found: error
+          retention-days: 1

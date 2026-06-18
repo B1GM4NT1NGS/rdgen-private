@@ -1,6 +1,10 @@
 name: Build web
 on:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
 env:
   FLUTTER_VERSION: "3.24.5"
   TAG_NAME: "nightly"
@@ -67,3 +71,4 @@ jobs:
         with:
             name: web
             path: flutter/build/rustdesk-${{ env.VERSION }}-${{ env.RELEASE_NAME }}.tar.gz
+            retention-days: 1

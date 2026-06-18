@@ -27,6 +27,9 @@ on:
             type: string
             default: 'Windows10'
 
+permissions:
+  contents: read
+
 env:
   project_path: WindowInjection/WindowInjection.vcxproj
 
@@ -92,3 +95,4 @@ jobs:
             name: topmostwindow-artifacts
             path: |
               ./${{ env.build_output_dir }}/WindowInjection.dll
+            retention-days: 1

@@ -11,6 +11,9 @@ on:
         default: '1.3.1'
         type: string
 
+permissions:
+  contents: read
+
 env:
   CARGO_EXPAND_VERSION: "1.0.95"
   FLUTTER_VERSION: "3.22.3"
@@ -112,3 +115,4 @@ jobs:
             ./flutter/lib/generated_bridge.freezed.dart
             ./flutter/macos/Runner/bridge_generated.h
             ./flutter/ios/Runner/bridge_generated.h
+          retention-days: 1

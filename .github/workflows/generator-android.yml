@@ -14,6 +14,9 @@ on:
         default: ''
         type: string
 
+permissions:
+  contents: read
+  actions: write
 
 env:
   SCITER_RUST_VERSION: "1.75" # https://github.com/rustdesk/rustdesk/discussions/7503, also 1.78 has ABI change which causes our sciter version not working, https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
@@ -474,6 +477,7 @@ jobs:
         with:
           name: librustdesk.so.${{ matrix.job.target }}
           path: ./target/${{ matrix.job.target }}/release/liblibrustdesk.so
+          retention-days: 1
 
       - name: icons
         if: ${{ env.iconlink_url != 'false' }}
@@ -629,5 +633,16 @@ jobs:
     steps:
       - name: Delete secrets artifact
         uses: geekyeggo/delete-artifact@v5
+        continue-on-error: true
         with:
           name: encrypted-secrets-zip
+      - name: Delete bridge artifact
+        uses: geekyeggo/delete-artifact@v5
+        continue-on-error: true
+        with:
+          name: bridge-artifact
+      - name: Delete Android library artifacts
+        uses: geekyeggo/delete-artifact@v5
+        continue-on-error: true
+        with:
+          name: librustdesk.so.*
