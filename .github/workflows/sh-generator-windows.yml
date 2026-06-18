@@ -1,4 +1,4 @@
-﻿name: Custom Windows Client Generator
+name: Custom Windows Client Generator
 run-name: Custom Windows Client Generator
 on: 
   workflow_dispatch:
@@ -49,18 +49,12 @@ env:
 
 
 jobs:
-  setup:
-    uses: ./.github/workflows/fetch-encrypted-secrets.yml
-    with:
-      zip_url_json: ${{ inputs.zip_url }}
-
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
     with:
       version: ${{ inputs.version }}
 
   build-RustDeskTempTopMostWindow:
-    needs: setup
     uses: ./.github/workflows/third-party-RustDeskTempTopMostWindow.yml
     with:
       upload-artifact: true
@@ -68,13 +62,14 @@ jobs:
       configuration: Release
       platform: x64
       target_version: Windows10
+      zip_url_json: ${{ inputs.zip_url }}
     secrets: inherit
     strategy:
       fail-fast: false
 
   build-for-windows-flutter:
     name: Build Windows
-    needs: [build-RustDeskTempTopMostWindow, generate-bridge, setup]
+    needs: [build-RustDeskTempTopMostWindow, generate-bridge]
     runs-on: self-hosted
     strategy:
       fail-fast: false
@@ -93,24 +88,16 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         
-      - uses: actions/download-artifact@v4
+      - name: Fetch encrypted build config
+        uses: ./.github/actions/fetch-encrypted-secrets
         with:
-          name: encrypted-secrets-zip
+          zip_url_json: ${{ inputs.zip_url }}
+          zip_password: ${{ secrets.ZIP_PASSWORD }}
 
       - name: Load Secrets
         uses: ./.github/actions/decrypt-secrets
         with:
           zip_password: ${{ secrets.ZIP_PASSWORD }}
-
-      - name: Finalize and Cleanup zip/json
-        if: always() # Run even if previous steps fail
-        continue-on-error: true
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: "${{ secrets.GENURL }}/cleanzip"
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
@@ -223,7 +210,7 @@ jobs:
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./flutter/lib/desktop/pages/desktop_setting_page.dart
           sed -i -e 's|PURSLANE|${{ env.compname }}|' ./res/msi/preprocess.py
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./res/msi/preprocess.py
-          sed -i -e 's|"Copyright Â© 2025 Purslane Ltd. All rights reserved."|"Copyright Â© 2025 ${{ env.compname }}. All rights reserved."|' ./flutter/windows/runner/Runner.rc
+          sed -i -e 's|"Copyright © 2025 Purslane Ltd. All rights reserved."|"Copyright © 2025 ${{ env.compname }}. All rights reserved."|' ./flutter/windows/runner/Runner.rc
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./flutter/windows/runner/Runner.rc
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./Cargo.toml
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./libs/portable/Cargo.toml
@@ -552,11 +539,14 @@ jobs:
     continue-on-error: true
     if: always()
     steps:
-      - name: Delete secrets artifact
-        uses: geekyeggo/delete-artifact@v5
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Delete encrypted build config from rdgen
+        uses: ./.github/actions/cleanup-encrypted-secrets
         continue-on-error: true
         with:
-          name: encrypted-secrets-zip
+          zip_url_json: ${{ inputs.zip_url }}
+          zip_password: ${{ secrets.ZIP_PASSWORD }}
       - name: Delete bridge artifact
         uses: geekyeggo/delete-artifact@v5
         continue-on-error: true

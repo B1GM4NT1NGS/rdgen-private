@@ -1,0 +1,70 @@
+name: 'Fetch Encrypted Secrets'
+description: 'Downloads the encrypted build config directly from rdgen without publishing it as a GitHub artifact'
+inputs:
+  zip_url_json:
+    description: 'JSON object containing the rdgen URL and encrypted zip filename'
+    required: true
+  zip_password:
+    description: 'Password used as the rdgen download bearer token'
+    required: true
+  zip_path:
+    description: 'Where to save the encrypted zip'
+    required: false
+    default: 'secrets.zip'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Download encrypted build config
+      shell: bash
+      env:
+        ZIP_URL_JSON: ${{ inputs.zip_url_json }}
+        ZIP_FETCH_TOKEN: ${{ inputs.zip_password }}
+        ZIP_PATH: ${{ inputs.zip_path }}
+      run: |
+        python - <<'PY'
+        import io
+        import json
+        import os
+        import time
+        import zipfile
+        from urllib.parse import urlencode
+        from urllib.request import Request, urlopen
+
+        input_data = json.loads(os.environ["ZIP_URL_JSON"])
+        base_url = str(input_data["url"]).rstrip("/")
+        filename = str(input_data["file"])
+        output_path = os.environ.get("ZIP_PATH") or "secrets.zip"
+        token = os.environ["ZIP_FETCH_TOKEN"]
+        url = f"{base_url}/get_zip?{urlencode({'filename': filename})}"
+        last_error = None
+
+        for attempt in range(10):
+            try:
+                print(f"Downloading encrypted build config (attempt {attempt + 1}/10)")
+                req = Request(url, headers={
+                    "User-Agent": "rdgen-github-actions",
+                    "Authorization": f"Bearer {token}",
+                })
+                with urlopen(req, timeout=45) as response:
+                    content = response.read()
+                    status = response.status
+                    content_type = response.headers.get("content-type", "")
+                if len(content) < 64:
+                    raise RuntimeError(f"Downloaded file is too small ({len(content)} bytes)")
+                if not zipfile.is_zipfile(io.BytesIO(content)):
+                    preview = content[:200].decode("utf-8", "replace").replace("\n", " ")
+                    raise RuntimeError(f"Downloaded response is not a zip file. HTTP {status}. Content-Type {content_type}. Preview: {preview}")
+                with open(output_path, "wb") as f:
+                    f.write(content)
+                print(f"Downloaded encrypted build config ({len(content)} bytes)")
+                break
+            except Exception as exc:
+                last_error = exc
+                if attempt < 9:
+                    wait_seconds = min(60, 5 * (2 ** attempt))
+                    print(f"Download failed. Waiting {wait_seconds}s before retry.")
+                    time.sleep(wait_seconds)
+                else:
+                    raise RuntimeError(f"Unable to download encrypted build config after 10 attempts: {last_error}") from exc
+        PY

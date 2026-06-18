@@ -1,4 +1,4 @@
-﻿name: Custom Windows x86 Client Generator
+name: Custom Windows x86 Client Generator
 run-name: Custom Windows x86 Client Generator
 on: 
   workflow_dispatch:
@@ -54,14 +54,8 @@ env:
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
 jobs:
-  setup:
-    uses: ./.github/workflows/fetch-encrypted-secrets.yml
-    with:
-      zip_url_json: ${{ inputs.zip_url }}
-
   build-for-windows-sciter:
     name: ${{ matrix.job.target }} (${{ matrix.job.os }})
-    needs: setup
     runs-on: ${{ matrix.job.os }}
     # Temporarily disable this action due to additional test is needed.
     # if: false
@@ -82,24 +76,16 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         
-      - uses: actions/download-artifact@v4
+      - name: Fetch encrypted build config
+        uses: ./.github/actions/fetch-encrypted-secrets
         with:
-          name: encrypted-secrets-zip
+          zip_url_json: ${{ inputs.zip_url }}
+          zip_password: ${{ secrets.ZIP_PASSWORD }}
 
       - name: Load Secrets
         uses: ./.github/actions/decrypt-secrets
         with:
           zip_password: ${{ secrets.ZIP_PASSWORD }}
-
-      - name: Finalize and Cleanup zip/json
-        if: always() # Run even if previous steps fail
-        continue-on-error: true
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: "${{ secrets.GENURL }}/cleanzip"
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
@@ -445,8 +431,11 @@ jobs:
     continue-on-error: true
     if: always()
     steps:
-      - name: Delete secrets artifact
-        uses: geekyeggo/delete-artifact@v5
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Delete encrypted build config from rdgen
+        uses: ./.github/actions/cleanup-encrypted-secrets
         continue-on-error: true
         with:
-          name: encrypted-secrets-zip
+          zip_url_json: ${{ inputs.zip_url }}
+          zip_password: ${{ secrets.ZIP_PASSWORD }}

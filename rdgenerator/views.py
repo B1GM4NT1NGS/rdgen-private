@@ -564,35 +564,68 @@ def save_custom_client(request):
     return HttpResponse("File saved successfully!")
 
 def cleanup_secrets(request):
-    # Pass the UUID as a query param or in JSON body
+    if not zip_request_authorized(request):
+        return HttpResponse("Not found", status=404)
+
     data = json.loads(request.body)
     my_uuid = data.get('uuid')
+    zip_filename = safe_temp_zip_name(data.get('filename'))
     
-    if not my_uuid:
-        return HttpResponse("Missing UUID", status=400)
+    if not my_uuid and not zip_filename:
+        return HttpResponse("Missing cleanup target", status=400)
 
-    # 1. Find the files in your temp directory matching the UUID
     temp_dir = os.path.join('temp_zips')
-    
-    # We look for any file starting with 'secrets_' and containing the uuid
-    for filename in os.listdir(temp_dir):
-        if my_uuid in filename and filename.endswith('.zip'):
-            file_path = os.path.join(temp_dir, filename)
-            try:
+    candidates = []
+
+    if zip_filename:
+        candidates.append(zip_filename)
+    elif os.path.isdir(temp_dir):
+        for filename in os.listdir(temp_dir):
+            if my_uuid in filename and filename.endswith('.zip'):
+                candidates.append(filename)
+
+    for filename in candidates:
+        file_path = os.path.join(temp_dir, filename)
+        try:
+            if os.path.exists(file_path):
                 os.remove(file_path)
                 print(f"Successfully deleted {file_path}")
-            except OSError as e:
-                print(f"Error deleting file: {e}")
+        except OSError as e:
+            print(f"Error deleting file: {e}")
 
     return HttpResponse("Cleanup successful", status=200)
 
+
+def zip_request_authorized(request):
+    expected = getattr(_settings, "ZIP_PASSWORD", "") or ""
+    auth = request.META.get("HTTP_AUTHORIZATION", "")
+    token = ""
+    if auth.lower().startswith("bearer "):
+        token = auth[7:].strip()
+    token = token or request.META.get("HTTP_X_ZIP_TOKEN", "")
+    return bool(expected) and secrets.compare_digest(str(token), str(expected))
+
+
+def safe_temp_zip_name(filename):
+    filename = os.path.basename(str(filename or ""))
+    if not filename.startswith("secrets_") or not filename.endswith(".zip"):
+        return ""
+    if not re.fullmatch(r"secrets_[A-Za-z0-9._-]+\.zip", filename):
+        return ""
+    return filename
+
 def get_zip(request):
-    filename = request.GET['filename']
-    #filename = filename+".exe"
-    file_path = os.path.join('temp_zips',filename)
+    if not zip_request_authorized(request):
+        return HttpResponse("Not found", status=404)
+    filename = safe_temp_zip_name(request.GET.get('filename'))
+    if not filename:
+        return HttpResponse("Not found", status=404)
+    file_path = os.path.join('temp_zips', filename)
+    if not os.path.exists(file_path):
+        return HttpResponse("Not found", status=404)
     with open(file_path, 'rb') as file:
         response = HttpResponse(file, headers={
-            'Content-Type': 'application/vnd.microsoft.portable-executable',
+            'Content-Type': 'application/zip',
             'Content-Disposition': f'attachment; filename="{filename}"'
         })
 

@@ -1,0 +1,42 @@
+name: 'Cleanup Encrypted Secrets'
+description: 'Deletes the encrypted build config from rdgen after the workflow no longer needs it'
+inputs:
+  zip_url_json:
+    description: 'JSON object containing the rdgen URL and encrypted zip filename'
+    required: true
+  zip_password:
+    description: 'Password used as the rdgen cleanup bearer token'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Delete encrypted build config from rdgen
+      shell: bash
+      env:
+        ZIP_URL_JSON: ${{ inputs.zip_url_json }}
+        ZIP_FETCH_TOKEN: ${{ inputs.zip_password }}
+      run: |
+        python - <<'PY'
+        import json
+        import os
+        from urllib.request import Request, urlopen
+
+        input_data = json.loads(os.environ["ZIP_URL_JSON"])
+        base_url = str(input_data["url"]).rstrip("/")
+        filename = str(input_data["file"])
+        token = os.environ["ZIP_FETCH_TOKEN"]
+        body = json.dumps({"filename": filename}).encode("utf-8")
+        req = Request(
+            f"{base_url}/cleanzip",
+            data=body,
+            headers={
+                "User-Agent": "rdgen-github-actions",
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urlopen(req, timeout=30) as response:
+            print(f"Encrypted build config cleanup returned HTTP {response.status}")
+        PY
