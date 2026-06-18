@@ -58,12 +58,7 @@ def generator_view(request):
         if form.is_valid():
             user_secret = form.cleaned_data['sh_secret_field']
             platform = form.cleaned_data['platform']
-            build_mode = form.cleaned_data.get('build_mode') or 'github'
-            selfhosted = build_mode == 'local' or (_settings.SH_SECRET and _settings.SH_SECRET == user_secret)
-            if build_mode == 'local' and platform not in {'linux', 'android'}:
-                return JsonResponse({
-                    "error": "Docker local builds are currently enabled for Linux and Android only. Use GitHub hosted for Windows/macOS, or add an OS-specific self-hosted runner.",
-                }, status=400)
+            selfhosted = bool(_settings.SH_SECRET and _settings.SH_SECRET == user_secret)
             version = form.cleaned_data['version']
             delayFix = form.cleaned_data['delayFix']
             cycleMonitor = form.cleaned_data['cycleMonitor']
@@ -265,11 +260,9 @@ def generator_view(request):
                 'android': 'generator-android.yml',
                 'macos': 'generator-macos.yml',
             }
-            local_workflows = {
-                'linux': 'sh-generator-linux.yml',
-                'android': 'sh-generator-android.yml',
-            }
-            workflow_file = (local_workflows if selfhosted else workflows).get(platform, workflows['windows'])
+            workflow_file = workflows.get(platform, workflows['windows'])
+            if platform == 'windows' and selfhosted:
+                workflow_file = 'sh-generator-windows.yml'
             url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/'+workflow_file+'/dispatches'
 
             #url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rustdesk/actions/workflows/test.yml/dispatches'  
@@ -299,8 +292,7 @@ def generator_view(request):
                 "removeNewVersionNotif": 'true' if removeNewVersionNotif else 'false',
                 "compname": compname,
                 "androidappid":androidappid,
-                "filename":filename,
-                "build_mode":build_mode
+                "filename":filename
             }
 
             temp_json_path = f"data_{uuid.uuid4()}.json"
@@ -507,12 +499,7 @@ def startgh(request):
     data_ = json.loads(request.body)
     ####from here run the github action, we need user, repo, access token.
     platform = data_.get('platform') or 'windows'
-    build_mode = data_.get('build_mode') or data_.get('buildMode') or 'github'
-    if build_mode == 'local' and platform not in {'linux', 'android'}:
-        return JsonResponse({
-            "error": "Docker local builds are currently enabled for Linux and Android only. Use GitHub hosted for Windows/macOS, or add an OS-specific self-hosted runner.",
-        }, status=400)
-    workflow = ('sh-generator-' if build_mode == 'local' else 'generator-') + platform + '.yml'
+    workflow = 'generator-' + platform + '.yml'
     url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/'+workflow+'/dispatches'  
     data = {
         "ref": _settings.GHBRANCH,
