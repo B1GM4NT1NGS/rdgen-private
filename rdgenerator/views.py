@@ -21,6 +21,14 @@ from urllib.parse import quote
 def env_default(name, fallback=""):
     return (os.environ.get(name) or fallback or "").strip()
 
+def api_server_url(value=""):
+    target = str(value or "").strip()
+    if not target:
+        return ""
+    if target.lower().startswith(("http://", "https://")):
+        return target.rstrip("/")
+    return "http://" + target.rstrip("/")
+
 def safe_app_name(value=""):
     appname = str(value or env_default('RDGEN_DEFAULT_APP_NAME', 'BackupIT')).strip()
     if not appname or appname.lower() == "rustdesk":
@@ -76,6 +84,7 @@ def generator_view(request):
                 key = env_default('RDGEN_DEFAULT_KEY', '')
             if not apiServer:
                 apiServer = env_default('RDGEN_DEFAULT_API_SERVER', server + ":21114")
+            apiServer = api_server_url(apiServer)
             if not urlLink:
                 urlLink = env_default('RDGEN_DEFAULT_URL_LINK', "https://www.backupit.co.uk")
             if not downloadLink:
@@ -168,6 +177,11 @@ def generator_view(request):
                 decodedCustom['app-name'] = appname
             decodedCustom['override-settings'] = {}
             decodedCustom['default-settings'] = {}
+            decodedCustom['override-settings']['custom-rendezvous-server'] = server
+            decodedCustom['override-settings']['relay-server'] = server
+            decodedCustom['override-settings']['api-server'] = apiServer
+            if key:
+                decodedCustom['override-settings']['key'] = key
             if permPass != "":
                 decodedCustom['password'] = permPass
             if theme != "system":
@@ -506,7 +520,7 @@ def startgh(request):
         "inputs":{
             "server":data_.get('server') or env_default('RDGEN_DEFAULT_SERVER', 'server.v22.online'),
             "key":data_.get('key') or env_default('RDGEN_DEFAULT_KEY', ''),
-            "apiServer":data_.get('apiServer') or env_default('RDGEN_DEFAULT_API_SERVER', 'server.v22.online:21114'),
+            "apiServer":api_server_url(data_.get('apiServer') or env_default('RDGEN_DEFAULT_API_SERVER', 'server.v22.online:21114')),
             "custom":data_.get('custom'),
             "uuid":data_.get('uuid'),
             "iconlink":data_.get('iconlink'),
