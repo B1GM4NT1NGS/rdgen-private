@@ -541,8 +541,158 @@ jobs:
             #   sed -ie '/^%files$/i\\n' "$file"
             # done
 
+            brand_deb_package() {
+              local deb_path="$1"
+              local source_name="${filename:-${{ env.filename }}}"
+              local app_name="${appname:-${{ env.appname }}}"
+              local pkg_name
+              pkg_name="$(printf '%s' "$source_name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9+.-]+/-/g; s/^[^a-z0-9]+//; s/[^a-z0-9]+$//')"
+              [ -n "$pkg_name" ] || pkg_name="backupit"
+              [ -n "$app_name" ] || app_name="BackupIT"
+
+              local workdir
+              workdir="$(mktemp -d)"
+              dpkg-deb -R "$deb_path" "$workdir"
+
+              sed -i -E "s|^Package: .*|Package: $pkg_name|" "$workdir/DEBIAN/control"
+              sed -i -E "s|^Maintainer: .*|Maintainer: $app_name <support@backupit.co.uk>|" "$workdir/DEBIAN/control"
+              sed -i -E "s|^Description: .*|Description: $app_name remote support client.|" "$workdir/DEBIAN/control"
+              grep -q '^Conflicts:' "$workdir/DEBIAN/control" || sed -i '/^Recommends:/a Conflicts: rustdesk\nReplaces: rustdesk\nProvides: rustdesk' "$workdir/DEBIAN/control"
+
+              if [ -d "$workdir/usr/share/rustdesk" ]; then
+                mv "$workdir/usr/share/rustdesk" "$workdir/usr/share/$pkg_name"
+              fi
+              rm -f "$workdir/usr/bin/rustdesk"
+              rm -f "$workdir/usr/share/applications/rustdesk.desktop" "$workdir/usr/share/applications/rustdesk-link.desktop"
+              find "$workdir/usr/share/icons" -type f -name 'rustdesk.*' 2>/dev/null | while read -r icon; do
+                mv "$icon" "$(dirname "$icon")/$pkg_name.${icon##*.}"
+              done
+
+              cat > "$workdir/usr/share/applications/$pkg_name.desktop" <<EOF
+            [Desktop Entry]
+            Name=$app_name
+            GenericName=Remote Desktop
+            Comment=$app_name Remote Support
+            Exec=$pkg_name %u
+            Icon=$pkg_name
+            Terminal=false
+            Type=Application
+            StartupNotify=true
+            Categories=Network;RemoteAccess;GTK;
+            Keywords=remote-control;remote-desktop;support;backupit;
+            Actions=new-window;
+            StartupWMClass=$pkg_name
+
+            [Desktop Action new-window]
+            Name=Open a New Window
+            Exec=$pkg_name %u
+            EOF
+
+              cat > "$workdir/usr/share/applications/$pkg_name-link.desktop" <<EOF
+            [Desktop Entry]
+            Name=$app_name
+            NoDisplay=true
+            MimeType=x-scheme-handler/rustdesk;
+            TryExec=$pkg_name
+            Exec=$pkg_name %u
+            Icon=$pkg_name
+            Terminal=false
+            Type=Application
+            StartupNotify=false
+            StartupWMClass=$pkg_name
+            EOF
+
+              mkdir -p "$workdir/usr/share/$pkg_name/files/systemd"
+              cat > "$workdir/usr/share/$pkg_name/files/systemd/$pkg_name.service" <<EOF
+            [Unit]
+            Description=$app_name
+            Requires=network.target
+            After=systemd-user-sessions.service
+
+            [Service]
+            Type=simple
+            ExecStart=/usr/bin/$pkg_name --service
+            ExecStop=/usr/bin/pkill -f "$pkg_name --"
+            PIDFile=/run/$pkg_name.pid
+            KillMode=mixed
+            TimeoutStopSec=30
+            User=root
+            LimitNOFILE=100000
+            Environment="PULSE_LATENCY_MSEC=60" "PIPEWIRE_LATENCY=1024/48000"
+
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+              rm -f "$workdir/usr/share/$pkg_name/files/systemd/rustdesk.service"
+
+              cat > "$workdir/DEBIAN/preinst" <<EOF
+            #!/bin/bash
+            set -e
+            case "\$1" in
+              install|upgrade)
+                if command -v systemctl >/dev/null 2>&1; then
+                  systemctl stop $pkg_name >/dev/null 2>&1 || true
+                  systemctl stop rustdesk >/dev/null 2>&1 || true
+                fi
+                rm -f /usr/bin/$pkg_name
+                ;;
+            esac
+            exit 0
+            EOF
+
+              cat > "$workdir/DEBIAN/postinst" <<EOF
+            #!/bin/bash
+            set -e
+            if [ "\$1" = configure ]; then
+              ln -snf /usr/share/$pkg_name/rustdesk /usr/bin/$pkg_name
+              if command -v systemctl >/dev/null 2>&1; then
+                install -D -m 0644 /usr/share/$pkg_name/files/systemd/$pkg_name.service /usr/lib/systemd/system/$pkg_name.service
+                systemctl daemon-reload || true
+                systemctl enable $pkg_name >/dev/null 2>&1 || true
+                systemctl --no-block restart $pkg_name >/dev/null 2>&1 || true
+              fi
+              command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database >/dev/null 2>&1 || true
+              command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q /usr/share/icons/hicolor >/dev/null 2>&1 || true
+            fi
+            exit 0
+            EOF
+
+              cat > "$workdir/DEBIAN/prerm" <<EOF
+            #!/bin/bash
+            set -e
+            case "\$1" in
+              remove|upgrade)
+                if command -v systemctl >/dev/null 2>&1; then
+                  systemctl stop $pkg_name >/dev/null 2>&1 || true
+                  systemctl disable $pkg_name >/dev/null 2>&1 || true
+                fi
+                rm -f /usr/bin/$pkg_name
+                rm -f /etc/systemd/system/$pkg_name.service /usr/lib/systemd/system/$pkg_name.service
+                ;;
+            esac
+            exit 0
+            EOF
+
+              cat > "$workdir/DEBIAN/postrm" <<EOF
+            #!/bin/bash
+            set -e
+            case "\$1" in
+              purge)
+                rm -rf /root/.config/$pkg_name || true
+                ;;
+            esac
+            exit 0
+            EOF
+              chmod 755 "$workdir/DEBIAN/preinst" "$workdir/DEBIAN/postinst" "$workdir/DEBIAN/prerm" "$workdir/DEBIAN/postrm"
+
+              dpkg-deb -b "$workdir" "$deb_path.branded"
+              mv "$deb_path.branded" "$deb_path"
+              rm -rf "$workdir"
+            }
+
             python3 ./build.py --flutter --skip-cargo
             for name in *.deb; do
+              brand_deb_package "$name"
               mv "$name" /workspace/output/"${{ env.filename }}-${{ matrix.job.arch }}.deb"
             done
 
