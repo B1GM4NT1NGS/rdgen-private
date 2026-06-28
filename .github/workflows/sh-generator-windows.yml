@@ -261,6 +261,8 @@ jobs:
             # Remove Setup Server Tip
             Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/removeSetupServerTip.diff?ref=${{ github.ref_name }}" -OutFile removeSetupServerTip.diff
             git apply removeSetupServerTip.diff  
+            Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_terminal_cm_hidden.py?ref=${{ github.ref_name }}" -OutFile backupit_terminal_cm_hidden.py
+            python backupit_terminal_cm_hidden.py
           
       - name: magick stuff
         if: ${{ env.iconlink_url != 'false' }}

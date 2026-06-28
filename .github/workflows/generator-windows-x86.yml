@@ -217,6 +217,8 @@ jobs:
           command: |
             Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/allowCustom.diff?ref=${{ github.ref_name }}" -OutFile allowCustom.diff
             git apply allowCustom.diff
+            Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_terminal_cm_hidden.py?ref=${{ github.ref_name }}" -OutFile backupit_terminal_cm_hidden.py
+            python backupit_terminal_cm_hidden.py
 
       - name: Install LLVM and Clang
         uses: rustdesk-org/install-llvm-action-32bit@master
