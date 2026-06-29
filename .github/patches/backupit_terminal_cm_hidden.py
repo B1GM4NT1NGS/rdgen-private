@@ -110,6 +110,165 @@ function onlyBackupITNonDesktopConnections() {
     return False
 
 
+def patch_flutter_main(root: Path) -> bool:
+    path = root / "flutter" / "lib" / "main.dart"
+    if not path.exists():
+        return False
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    original = text
+    old = """  final hide = await bind.cmGetConfig(name: "hide_cm") == 'true';
+  gFFI.serverModel.hideCm = hide;
+  if (hide) {
+    await hideCmWindow(isStartup: true);
+  } else {
+    await showCmWindow(isStartup: true);
+  }
+"""
+    new = """  final hide = await bind.cmGetConfig(name: "hide_cm") == 'true';
+  gFFI.serverModel.hideCm = hide;
+  // BackupIT: start CM hidden; ServerModel shows it again for desktop sessions.
+  await hideCmWindow(isStartup: true);
+"""
+    if old in text:
+        text = text.replace(old, new, 1)
+    if text != original:
+        path.write_text(text, encoding="utf-8")
+        return True
+    return False
+
+
+def patch_flutter_server_model(root: Path) -> bool:
+    path = root / "flutter" / "lib" / "models" / "server_model.dart"
+    if not path.exists():
+        return False
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    original = text
+
+    clients_getter = "  List<Client> get clients => _clients;\n"
+    visibility_helpers = """  List<Client> get clients => _clients;
+
+  bool get hasBackupITDesktopConnections =>
+      _clients.any((client) => !client.isBackupITNonDesktop);
+
+  bool get onlyBackupITNonDesktopConnections =>
+      _clients.isNotEmpty && !hasBackupITDesktopConnections;
+
+  Future<void> updateBackupITCmVisibility() async {
+    if (desktopType != DesktopType.cm) return;
+    if (_clients.isEmpty || onlyBackupITNonDesktopConnections) {
+      await hideCmWindow();
+    } else if (!hideCm) {
+      await showCmWindow();
+    }
+  }
+"""
+    if "hasBackupITDesktopConnections" not in text and clients_getter in text:
+        text = text.replace(clients_getter, visibility_helpers, 1)
+
+    text = text.replace(
+        """          if (_clients.isEmpty) {
+            hideCmWindow();
+            if (_zeroClientLengthCounter++ == 12) {
+              // 6 second
+              windowManager.close();
+            }
+          } else {
+            _zeroClientLengthCounter = 0;
+            if (!hideCm) showCmWindow();
+          }
+""",
+        """          if (_clients.isEmpty) {
+            hideCmWindow();
+            if (_zeroClientLengthCounter++ == 12) {
+              // 6 second
+              windowManager.close();
+            }
+          } else {
+            _zeroClientLengthCounter = 0;
+            await updateBackupITCmVisibility();
+          }
+""",
+        1,
+    )
+
+    text = text.replace(
+        """    if (desktopType == DesktopType.cm) {
+      if (_clients.isEmpty) {
+        hideCmWindow();
+      } else if (!hideCm) {
+        showCmWindow();
+      }
+    }
+""",
+        """    if (desktopType == DesktopType.cm) {
+      await updateBackupITCmVisibility();
+    }
+""",
+        1,
+    )
+
+    text = text.replace(
+        """      if (desktopType == DesktopType.cm && !hideCm) {
+        showCmWindow();
+      }
+""",
+        """      updateBackupITCmVisibility();
+""",
+        1,
+    )
+
+    text = text.replace(
+        """    Future.delayed(Duration.zero, () async {
+      if (!hideCm) windowOnTop(null);
+    });
+    // Only do the hidden task when on Desktop.
+    if (client.authorized && isDesktop) {
+      cmHiddenTimer = Timer(const Duration(seconds: 3), () {
+        if (!hideCm) windowManager.minimize();
+        cmHiddenTimer = null;
+      });
+    }
+""",
+        """    Future.delayed(Duration.zero, () async {
+      if (!hideCm && !client.isBackupITNonDesktop) windowOnTop(null);
+    });
+    // Only do the hidden task when on Desktop.
+    if (client.authorized && isDesktop && !client.isBackupITNonDesktop) {
+      cmHiddenTimer = Timer(const Duration(seconds: 3), () {
+        if (!hideCm) windowManager.minimize();
+        cmHiddenTimer = null;
+      });
+    }
+""",
+        1,
+    )
+
+    client_field = """  bool incomingVoiceCall = false;
+
+  RxInt unreadChatMessageCount = 0.obs;
+"""
+    client_method = """  bool incomingVoiceCall = false;
+
+  bool get isBackupITNonDesktop =>
+      isTerminal || portForward.trim().isNotEmpty;
+
+  RxInt unreadChatMessageCount = 0.obs;
+"""
+    if "bool get isBackupITNonDesktop" not in text and client_field in text:
+        text = text.replace(client_field, client_method, 1)
+
+    text = text.replace(
+        "    portForward = json['port_forward'];",
+        "    portForward = json['port_forward'] ?? '';",
+        1,
+    )
+
+    if text != original:
+        path.write_text(text, encoding="utf-8")
+        return True
+    return False
+
+
 if __name__ == "__main__":
     root = Path.cwd()
     changed = []
@@ -117,6 +276,10 @@ if __name__ == "__main__":
         changed.append("src/ui.rs")
     if patch_cm_tis(root):
         changed.append("src/ui/cm.tis")
+    if patch_flutter_main(root):
+        changed.append("flutter/lib/main.dart")
+    if patch_flutter_server_model(root):
+        changed.append("flutter/lib/models/server_model.dart")
     if changed:
         print("BackupIT terminal CM hide patch applied: " + ", ".join(changed))
     else:
