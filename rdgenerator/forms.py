@@ -65,7 +65,7 @@ def env_bool(name, default=False):
 class GenerateForm(forms.Form):
     sh_secret_field = forms.CharField(required=False)
     #Platform
-    platform = forms.ChoiceField(choices=[('windows','Windows 64Bit'),('windows-x86','Windows 32Bit'),('linux','Linux'),('android','Android'),('macos','macOS')], initial='windows')
+    platform = forms.ChoiceField(choices=[('windows','Windows 64Bit'),('windows-x86','Windows 32Bit'),('windows-admin','Windows Admin'),('linux','Linux'),('android','Android'),('macos','macOS')], initial='windows')
     version = forms.ChoiceField(choices=FALLBACK_VERSION_CHOICES, initial='1.4.8')
     help_text="'master' is the development version (nightly build) with the latest features but may be less stable"
     delayFix = forms.BooleanField(initial=True, required=False)
@@ -145,7 +145,7 @@ class GenerateForm(forms.Form):
     #custom added features
     cycleMonitor = forms.BooleanField(initial=False, required=False)
     xOffline = forms.BooleanField(initial=False, required=False)
-    removeNewVersionNotif = forms.BooleanField(initial=True, required=False)
+    removeNewVersionNotif = forms.BooleanField(initial=False, required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -160,7 +160,7 @@ class GenerateForm(forms.Form):
         self.fields['compname'].initial = os.environ.get('RDGEN_DEFAULT_COMPANY', '')
         self.fields['appname'].initial = os.environ.get('RDGEN_DEFAULT_APP_NAME', '')
         self.fields['exename'].initial = os.environ.get('RDGEN_DEFAULT_FILE_NAME', '')
-        self.fields['removeNewVersionNotif'].initial = env_bool('RDGEN_DEFAULT_HIDE_NEW_VERSION_NOTICE', True)
+        self.fields['removeNewVersionNotif'].initial = env_bool('RDGEN_DEFAULT_HIDE_NEW_VERSION_NOTICE', False)
 
     def clean_iconfile(self):
         print("checking icon")

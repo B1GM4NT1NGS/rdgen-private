@@ -269,6 +269,8 @@ jobs:
             python allowCustom.py
             curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/removeSetupServerTip.diff?ref=${{ github.ref_name }}" -o removeSetupServerTip.diff
             git apply removeSetupServerTip.diff
+            curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_update_channel.py?ref=${{ github.ref_name }}" -o backupit_update_channel.py
+            python backupit_update_channel.py
             echo -n "${{ env.custom }}" | cat > ./custom_.txt
             # sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
             sed -i -e 's|https://admin.rustdesk.com|${{ env.apiServer }}|' ./src/common.rs

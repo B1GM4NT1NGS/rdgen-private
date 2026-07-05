@@ -29,6 +29,15 @@ def api_server_url(value=""):
         return target.rstrip("/")
     return "http://" + target.rstrip("/")
 
+def backupit_update_manifest_url(api_server, channel):
+    configured = env_default('BACKUPIT_UPDATE_MANIFEST_BASE', '')
+    if configured:
+        return configured.rstrip("/") + "/" + quote(channel, safe="")
+    base = api_server_url(api_server)
+    if not base:
+        return ""
+    return base.rstrip("/") + "/updates/manifest/" + quote(channel, safe="")
+
 def public_gen_url(request):
     configured = str(_settings.GENURL or "").strip().rstrip("/")
     if configured:
@@ -74,6 +83,8 @@ def generator_view(request):
         if form.is_valid():
             user_secret = form.cleaned_data['sh_secret_field']
             platform = form.cleaned_data['platform']
+            update_channel = platform
+            workflow_platform = 'windows' if platform == 'windows-admin' else platform
             selfhosted = bool(_settings.SH_SECRET and _settings.SH_SECRET == user_secret)
             version = form.cleaned_data['version']
             delayFix = form.cleaned_data['delayFix']
@@ -93,6 +104,7 @@ def generator_view(request):
             if not apiServer:
                 apiServer = env_default('RDGEN_DEFAULT_API_SERVER', server + ":21114")
             apiServer = api_server_url(apiServer)
+            backupitUpdateManifest = backupit_update_manifest_url(apiServer, update_channel)
             if not urlLink:
                 urlLink = env_default('RDGEN_DEFAULT_URL_LINK', "https://www.backupit.co.uk")
             if not downloadLink:
@@ -281,12 +293,13 @@ def generator_view(request):
             workflows = {
                 'windows': 'generator-windows.yml',
                 'windows-x86': 'generator-windows-x86.yml',
+                'windows-admin': 'generator-windows.yml',
                 'linux': 'generator-linux.yml',
                 'android': 'generator-android.yml',
                 'macos': 'generator-macos.yml',
             }
-            workflow_file = workflows.get(platform, workflows['windows'])
-            if platform == 'windows' and selfhosted:
+            workflow_file = workflows.get(workflow_platform, workflows['windows'])
+            if workflow_platform == 'windows' and selfhosted:
                 workflow_file = 'sh-generator-windows.yml'
             url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/'+workflow_file+'/dispatches'
 
@@ -310,6 +323,8 @@ def generator_view(request):
                 "genurl":_settings.GENURL,
                 "urlLink":urlLink,
                 "downloadLink":downloadLink,
+                "backupitUpdateManifest": backupitUpdateManifest,
+                "backupitUpdateChannel": update_channel,
                 "delayFix": 'true' if delayFix else 'false',
                 "rdgen":'true',
                 "cycleMonitor": 'true' if cycleMonitor else 'false',

@@ -364,6 +364,13 @@ jobs:
           sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
           # sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
 
+      - name: BackupIT update channel
+        continue-on-error: true
+        shell: bash
+        run: |
+          curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_update_channel.py?ref=${{ github.ref_name }}" -o backupit_update_channel.py
+          python backupit_update_channel.py
+
       - name: Remove scam alert on Android
         shell: bash
         run: |
