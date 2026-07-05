@@ -660,7 +660,10 @@ def get_zip(request):
     filename = safe_temp_zip_name(request.GET.get('filename'))
     if not filename:
         return HttpResponse("Not found", status=404)
-    file_path = os.path.join('temp_zips', filename)
+    base_dir = os.path.abspath('temp_zips')
+    file_path = os.path.abspath(os.path.join(base_dir, filename))
+    if not file_path.startswith(base_dir + os.sep):
+        return HttpResponse("Not found", status=404)
     if not os.path.exists(file_path):
         return HttpResponse("Not found", status=404)
     with open(file_path, 'rb') as file:
