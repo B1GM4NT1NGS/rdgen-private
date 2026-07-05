@@ -224,7 +224,7 @@ def patch_flutter_ffi():
 def patch_updater():
     path = Path("src/updater.rs")
     text = read(path)
-    old = '''        let download_url = update_url.replace("tag", "download");
+    old_arch_suffix = '''        let download_url = update_url.replace("tag", "download");
         let version = download_url.split('/').last().unwrap_or_default();
         #[cfg(target_os = "windows")]
         let download_url = if cfg!(feature = "flutter") {
@@ -245,7 +245,7 @@ def patch_updater():
             format!("{}/rustdesk-{}-x86-sciter.exe", download_url, version)
         };
 '''
-    new = '''        let is_backupit_direct_update = update_url.contains("/updates/download/");
+    new_arch_suffix = '''        let is_backupit_direct_update = update_url.contains("/updates/download/");
         let download_base_url = if is_backupit_direct_update {
             update_url.clone()
         } else {
@@ -281,8 +281,59 @@ def patch_updater():
         #[cfg(not(target_os = "windows"))]
         let download_url = download_base_url;
 '''
-    if old in text:
-        text = text.replace(old, new, 1)
+    old_x86_64 = '''        let download_url = update_url.replace("tag", "download");
+        let version = download_url.split('/').last().unwrap_or_default();
+        #[cfg(target_os = "windows")]
+        let download_url = if cfg!(feature = "flutter") {
+            format!(
+                "{}/rustdesk-{}-x86_64.{}",
+                download_url,
+                version,
+                if update_msi { "msi" } else { "exe" }
+            )
+        } else {
+            format!("{}/rustdesk-{}-x86-sciter.exe", download_url, version)
+        };
+'''
+    new_x86_64 = '''        let is_backupit_direct_update = update_url.contains("/updates/download/");
+        let download_base_url = if is_backupit_direct_update {
+            update_url.clone()
+        } else {
+            update_url.replace("tag", "download")
+        };
+        let version = download_base_url
+            .split('?')
+            .next()
+            .unwrap_or(&download_base_url)
+            .split('/')
+            .last()
+            .unwrap_or_default();
+        #[cfg(target_os = "windows")]
+        let download_url = if is_backupit_direct_update {
+            download_base_url.clone()
+        } else if cfg!(feature = "flutter") {
+            format!(
+                "{}/rustdesk-{}-x86_64.{}",
+                download_base_url,
+                version,
+                if update_msi { "msi" } else { "exe" }
+            )
+        } else {
+            format!("{}/rustdesk-{}-x86-sciter.exe", download_base_url, version)
+        };
+        #[cfg(not(target_os = "windows"))]
+        let download_url = download_base_url;
+'''
+    patched_download = "let is_backupit_direct_update = update_url.contains" in text
+    if not patched_download and old_arch_suffix in text:
+        text = text.replace(old_arch_suffix, new_arch_suffix, 1)
+        patched_download = True
+    if not patched_download and old_x86_64 in text:
+        text = text.replace(old_x86_64, new_x86_64, 1)
+        patched_download = True
+    if not patched_download:
+        raise RuntimeError("Unable to patch BackupIT updater download block; expected source was not found")
+
     marker = '''        if has_no_active_conns() {
             #[cfg(target_os = "windows")]
             update_new_version(update_msi, &version, &file_path);
