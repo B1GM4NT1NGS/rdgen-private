@@ -54,6 +54,14 @@ def default_version():
     choices = rustdesk_version_choices()
     return choices[1][0] if len(choices) > 1 else '1.4.8'
 
+
+def env_bool(name, default=False):
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 class GenerateForm(forms.Form):
     sh_secret_field = forms.CharField(required=False)
     #Platform
@@ -137,7 +145,7 @@ class GenerateForm(forms.Form):
     #custom added features
     cycleMonitor = forms.BooleanField(initial=False, required=False)
     xOffline = forms.BooleanField(initial=False, required=False)
-    removeNewVersionNotif = forms.BooleanField(initial=False, required=False)
+    removeNewVersionNotif = forms.BooleanField(initial=True, required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -152,6 +160,7 @@ class GenerateForm(forms.Form):
         self.fields['compname'].initial = os.environ.get('RDGEN_DEFAULT_COMPANY', '')
         self.fields['appname'].initial = os.environ.get('RDGEN_DEFAULT_APP_NAME', '')
         self.fields['exename'].initial = os.environ.get('RDGEN_DEFAULT_FILE_NAME', '')
+        self.fields['removeNewVersionNotif'].initial = env_bool('RDGEN_DEFAULT_HIDE_NEW_VERSION_NOTICE', True)
 
     def clean_iconfile(self):
         print("checking icon")
