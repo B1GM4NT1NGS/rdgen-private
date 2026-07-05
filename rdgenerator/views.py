@@ -29,6 +29,14 @@ def api_server_url(value=""):
         return target.rstrip("/")
     return "http://" + target.rstrip("/")
 
+def public_gen_url(request):
+    configured = str(_settings.GENURL or "").strip().rstrip("/")
+    if configured:
+        if configured.lower().startswith(("http://", "https://")):
+            return configured
+        return f"{_settings.PROTOCOL}://{configured}"
+    return f"{_settings.PROTOCOL}://{request.get_host()}"
+
 def safe_app_name(value=""):
     appname = str(value or env_default('RDGEN_DEFAULT_APP_NAME', 'BackupIT')).strip()
     if not appname or appname.lower() == "rustdesk":
@@ -131,9 +139,7 @@ def generator_view(request):
             if not all(char.isascii() for char in appname):
                 appname = env_default('RDGEN_DEFAULT_APP_NAME', 'BackupIT')
             myuuid = str(uuid.uuid4())
-            protocol = _settings.PROTOCOL
-            host = request.get_host()
-            full_url = (_settings.GENURL or "").rstrip("/") or f"{protocol}://{host}"
+            full_url = public_gen_url(request)
             try:
                 iconfile = form.cleaned_data.get('iconfile')
                 if not iconfile:
