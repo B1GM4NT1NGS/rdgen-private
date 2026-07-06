@@ -7,16 +7,7 @@ def patch_ui_rs(root: Path) -> bool:
         return False
     text = path.read_text(encoding="utf-8", errors="ignore")
     original = text
-    old = """    let hide_cm = *cm::HIDE_CM.lock().unwrap();
-    if !args.is_empty() && args[0] == "--cm" && hide_cm {
-        // run_app calls expand(show) + run_loop, we use collapse(hide) + run_loop instead to create a hidden window
-        frame.collapse(true);
-        frame.run_loop();
-        return;
-    }
-    frame.run_app();
-"""
-    new = """    let _hide_cm = *cm::HIDE_CM.lock().unwrap();
+    forced_hidden = """    let _hide_cm = *cm::HIDE_CM.lock().unwrap();
     if !args.is_empty() && args[0] == "--cm" {
         // BackupIT: start CM hidden; cm.tis shows it again for desktop sessions.
         frame.collapse(true);
@@ -25,23 +16,20 @@ def patch_ui_rs(root: Path) -> bool:
     }
     frame.run_app();
 """
-    if old in text:
-        text = text.replace(old, new, 1)
-    else:
-        text = text.replace(
-            'if !args.is_empty() && args[0] == "--cm" && hide_cm {',
-            'if !args.is_empty() && args[0] == "--cm" {',
-            1,
-        )
-        text = text.replace("let hide_cm =", "let _hide_cm =", 1)
-        text = text.replace(
-            "// run_app calls expand(show) + run_loop, we use collapse(hide) + run_loop instead to create a hidden window",
-            "// BackupIT: start CM hidden; cm.tis shows it again for desktop sessions.",
-            1,
-        )
+    normal_hide_cm = """    let hide_cm = *cm::HIDE_CM.lock().unwrap();
+    if !args.is_empty() && args[0] == "--cm" && hide_cm {
+        // run_app calls expand(show) + run_loop, we use collapse(hide) + run_loop instead to create a hidden window
+        frame.collapse(true);
+        frame.run_loop();
+        return;
+    }
+    frame.run_app();
+"""
+    if forced_hidden in text:
+        text = text.replace(forced_hidden, normal_hide_cm, 1)
     text = text.replace(
         "// BackupIT: start CM hidden; cm.tis shows it again for non-terminal sessions.",
-        "// BackupIT: start CM hidden; cm.tis shows it again for desktop sessions.",
+        "// run_app calls expand(show) + run_loop, we use collapse(hide) + run_loop instead to create a hidden window",
         1,
     )
     if text != original:
@@ -116,7 +104,12 @@ def patch_flutter_main(root: Path) -> bool:
         return False
     text = path.read_text(encoding="utf-8", errors="ignore")
     original = text
-    old = """  final hide = await bind.cmGetConfig(name: "hide_cm") == 'true';
+    forced_hidden = """  final hide = await bind.cmGetConfig(name: "hide_cm") == 'true';
+  gFFI.serverModel.hideCm = hide;
+  // BackupIT: start CM hidden; ServerModel shows it again for desktop sessions.
+  await hideCmWindow(isStartup: true);
+"""
+    normal_hide_cm = """  final hide = await bind.cmGetConfig(name: "hide_cm") == 'true';
   gFFI.serverModel.hideCm = hide;
   if (hide) {
     await hideCmWindow(isStartup: true);
@@ -124,13 +117,8 @@ def patch_flutter_main(root: Path) -> bool:
     await showCmWindow(isStartup: true);
   }
 """
-    new = """  final hide = await bind.cmGetConfig(name: "hide_cm") == 'true';
-  gFFI.serverModel.hideCm = hide;
-  // BackupIT: start CM hidden; ServerModel shows it again for desktop sessions.
-  await hideCmWindow(isStartup: true);
-"""
-    if old in text:
-        text = text.replace(old, new, 1)
+    if forced_hidden in text:
+        text = text.replace(forced_hidden, normal_hide_cm, 1)
     if text != original:
         path.write_text(text, encoding="utf-8")
         return True
