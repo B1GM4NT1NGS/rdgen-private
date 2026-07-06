@@ -315,7 +315,7 @@ jobs:
 
       - name: removeNewVersionNotif
         continue-on-error: true
-        if: env.removeNewVersionNotif == 'true'
+        if: env.removeNewVersionNotif == 'true' && env.backupitUpdateManifest == ''
         shell: bash
         run: | 
           sed -i -e 's|{software_update_url ? <UpdateMe /> : ""}||' ./src/ui/index.tis
