@@ -61,6 +61,17 @@ def safe_filename(value=""):
         return filename or "BackupIT"
     return env_default('RDGEN_DEFAULT_FILE_NAME', 'BackupIT')
 
+def backupit_update_channel(platform, filename="", pass_approve_mode=""):
+    platform = str(platform or "").strip()
+    name = str(filename or "").strip().lower().replace("_", "").replace("-", "")
+    mode = str(pass_approve_mode or "").strip().lower()
+    if platform == "windows":
+        if "askonly" in name or mode == "click":
+            return "windows-ask-only"
+        if "askandpass" in name or "askpass" in name or mode == "password-click":
+            return "windows-ask-pass"
+    return platform
+
 def github_error_response(response):
     try:
         payload = response.json()
@@ -83,7 +94,6 @@ def generator_view(request):
         if form.is_valid():
             user_secret = form.cleaned_data['sh_secret_field']
             platform = form.cleaned_data['platform']
-            update_channel = platform
             workflow_platform = 'windows' if platform == 'windows-admin' else platform
             selfhosted = bool(_settings.SH_SECRET and _settings.SH_SECRET == user_secret)
             version = form.cleaned_data['version']
@@ -104,7 +114,6 @@ def generator_view(request):
             if not apiServer:
                 apiServer = env_default('RDGEN_DEFAULT_API_SERVER', server + ":21114")
             apiServer = api_server_url(apiServer)
-            backupitUpdateManifest = backupit_update_manifest_url(apiServer, update_channel)
             if not urlLink:
                 urlLink = env_default('RDGEN_DEFAULT_URL_LINK', "https://www.backupit.co.uk")
             if not downloadLink:
@@ -126,6 +135,8 @@ def generator_view(request):
             themeDorO = form.cleaned_data['themeDorO']
             #runasadmin = form.cleaned_data['runasadmin']
             passApproveMode = form.cleaned_data['passApproveMode']
+            update_channel = backupit_update_channel(platform, filename, passApproveMode)
+            backupitUpdateManifest = backupit_update_manifest_url(apiServer, update_channel)
             denyLan = form.cleaned_data['denyLan']
             enableDirectIP = form.cleaned_data['enableDirectIP']
             #ipWhitelist = form.cleaned_data['ipWhitelist']
