@@ -206,6 +206,22 @@ def patch_flutter_server_model(root: Path) -> bool:
     )
 
     text = text.replace(
+        """      _addTab(client);
+      // remove disconnected
+""",
+        """      _addTab(client);
+      if (client.isBackupITNonDesktop) {
+        parent.target?.invokeMethod("cancel_notification", client.id);
+        Future.delayed(Duration.zero, () async {
+          await hideCmWindow();
+        });
+      }
+      // remove disconnected
+""",
+        1,
+    )
+
+    text = text.replace(
         """    Future.delayed(Duration.zero, () async {
       if (!hideCm) windowOnTop(null);
     });
@@ -217,9 +233,15 @@ def patch_flutter_server_model(root: Path) -> bool:
       });
     }
 """,
-        """    Future.delayed(Duration.zero, () async {
-      if (!hideCm && !client.isBackupITNonDesktop) windowOnTop(null);
-    });
+        """    if (client.isBackupITNonDesktop) {
+      Future.delayed(Duration.zero, () async {
+        await hideCmWindow();
+      });
+    } else {
+      Future.delayed(Duration.zero, () async {
+        if (!hideCm) windowOnTop(null);
+      });
+    }
     // Only do the hidden task when on Desktop.
     if (client.authorized && isDesktop && !client.isBackupITNonDesktop) {
       cmHiddenTimer = Timer(const Duration(seconds: 3), () {
@@ -248,6 +270,12 @@ def patch_flutter_server_model(root: Path) -> bool:
     text = text.replace(
         "    portForward = json['port_forward'];",
         "    portForward = json['port_forward'] ?? '';",
+        1,
+    )
+
+    text = text.replace(
+        "      if (isAndroid && !client.authorized) showLoginDialog(client);",
+        "      if (isAndroid && !client.authorized && !client.isBackupITNonDesktop) showLoginDialog(client);",
         1,
     )
 
