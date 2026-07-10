@@ -7,6 +7,7 @@ import os
 
 FALLBACK_VERSION_CHOICES = [
     ('master', 'nightly'),
+    ('1.4.9', '1.4.9'),
     ('1.4.8', '1.4.8'),
     ('1.4.7', '1.4.7'),
     ('1.4.6', '1.4.6'),
@@ -31,7 +32,6 @@ FALLBACK_VERSION_CHOICES = [
     ('1.2.3', '1.2.3'),
     ('1.2.2', '1.2.2'),
     ('1.2.1', '1.2.1'),
-    ('1.2.0', '1.2.0'),
 ]
 
 
@@ -52,7 +52,7 @@ def rustdesk_version_choices():
 
 def default_version():
     choices = rustdesk_version_choices()
-    return choices[1][0] if len(choices) > 1 else '1.4.8'
+    return choices[1][0] if len(choices) > 1 else '1.4.9'
 
 
 def env_bool(name, default=False):
@@ -66,7 +66,7 @@ class GenerateForm(forms.Form):
     sh_secret_field = forms.CharField(required=False)
     #Platform
     platform = forms.ChoiceField(choices=[('windows','Windows 64Bit'),('windows-x86','Windows 32Bit'),('windows-admin','Windows Admin'),('linux','Linux'),('android','Android'),('macos','macOS')], initial='windows')
-    version = forms.ChoiceField(choices=FALLBACK_VERSION_CHOICES, initial='1.4.8')
+    version = forms.ChoiceField(choices=FALLBACK_VERSION_CHOICES, initial='1.4.9')
     help_text="'master' is the development version (nightly build) with the latest features but may be less stable"
     delayFix = forms.BooleanField(initial=True, required=False)
 

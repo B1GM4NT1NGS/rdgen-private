@@ -94,6 +94,8 @@ def generator_view(request):
         if form.is_valid():
             user_secret = form.cleaned_data['sh_secret_field']
             platform = form.cleaned_data['platform']
+            update_channel = platform
+            workflow_platform = 'windows' if platform == 'windows-admin' else platform
             workflow_platform = 'windows' if platform == 'windows-admin' else platform
             selfhosted = bool(_settings.SH_SECRET and _settings.SH_SECRET == user_secret)
             version = form.cleaned_data['version']
