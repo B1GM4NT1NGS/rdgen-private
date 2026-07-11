@@ -116,6 +116,52 @@ const BACKUPIT_LAST_UPDATE_OPTION: &str = "{LAST_UPDATE_OPTION}";
     write(path, text)
 
 
+def patch_flutter_update_trigger():
+    path = Path("flutter/lib/common.dart")
+    text = read(path)
+    old = '''void checkUpdate() {
+  if (!isWeb) {
+    if (!bind.isCustomClient()) {
+      platformFFI.registerEventHandler(
+          kCheckSoftwareUpdateFinish, kCheckSoftwareUpdateFinish,
+          (Map<String, dynamic> evt) async {
+        if (evt['url'] is String) {
+          stateGlobal.updateUrl.value = evt['url'];
+        }
+      });
+      Timer(const Duration(seconds: 1), () async {
+        bind.mainGetSoftwareUpdateUrl();
+      });
+    }
+  }
+}
+'''
+    new = '''void checkUpdate() {
+  if (!isWeb) {
+    platformFFI.registerEventHandler(
+        kCheckSoftwareUpdateFinish, kCheckSoftwareUpdateFinish,
+        (Map<String, dynamic> evt) async {
+      if (evt['url'] is String) {
+        stateGlobal.updateUrl.value = evt['url'];
+      }
+    });
+    Timer(const Duration(seconds: 1), () async {
+      bind.mainGetSoftwareUpdateUrl();
+    });
+  }
+}
+'''
+    if old in text:
+        text = text.replace(old, new, 1)
+    elif "if (!bind.isCustomClient())" in text:
+        raise RuntimeError(
+            "Unable to enable BackupIT update startup trigger; custom-client guard changed upstream"
+        )
+    if "bind.mainGetSoftwareUpdateUrl();" not in text:
+        raise RuntimeError("BackupIT update startup trigger is missing")
+    write(path, text)
+
+
 def patch_update_progress():
     path = Path("flutter/lib/desktop/widgets/update_progress.dart")
     text = read(path)
@@ -357,6 +403,7 @@ def main():
         print("BackupIT update channel patch skipped: no backupitUpdateManifest env value")
         return 0
     patch_common()
+    patch_flutter_update_trigger()
     patch_update_progress()
     patch_desktop_home()
     patch_mobile_connection()
