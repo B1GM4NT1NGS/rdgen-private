@@ -7,6 +7,7 @@ import sys
 
 MANIFEST_URL = (os.environ.get("backupitUpdateManifest") or "").strip()
 CHANNEL = (os.environ.get("backupitUpdateChannel") or "").strip()
+BUILD_ID = (os.environ.get("uuid") or "").strip()
 LAST_UPDATE_OPTION = "backupit-last-update-url"
 
 
@@ -36,6 +37,7 @@ def patch_common():
         constants = f'''
 pub const BACKUPIT_UPDATE_MANIFEST_URL: &str = "{rust_string(MANIFEST_URL)}";
 pub const BACKUPIT_UPDATE_CHANNEL: &str = "{rust_string(CHANNEL)}";
+pub const BACKUPIT_BUILD_ID: &str = "{rust_string(BUILD_ID)}";
 const BACKUPIT_LAST_UPDATE_OPTION: &str = "{LAST_UPDATE_OPTION}";
 '''
         text = replace_once(text, marker, marker + constants, "BackupIT update constants")
@@ -52,6 +54,13 @@ const BACKUPIT_LAST_UPDATE_OPTION: &str = "{LAST_UPDATE_OPTION}";
             text,
             count=1,
         )
+        if "BACKUPIT_BUILD_ID" not in text:
+            text = text.replace(
+                f'pub const BACKUPIT_UPDATE_CHANNEL: &str = "{rust_string(CHANNEL)}";\n',
+                f'pub const BACKUPIT_UPDATE_CHANNEL: &str = "{rust_string(CHANNEL)}";\n'
+                f'pub const BACKUPIT_BUILD_ID: &str = "{rust_string(BUILD_ID)}";\n',
+                1,
+            )
 
     old_check = '''pub fn check_software_update() {
     if is_custom_client() {
@@ -93,8 +102,13 @@ const BACKUPIT_LAST_UPDATE_OPTION: &str = "{LAST_UPDATE_OPTION}";
             .get("download_url")
             .and_then(|value| value.as_str())
             .unwrap_or_default();
+        let source_app_id = payload
+            .get("source_app_id")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default();
         let last_update_url = LocalConfig::get_option(BACKUPIT_LAST_UPDATE_OPTION);
-        if available && !download_url.is_empty() && last_update_url != download_url {
+        let is_current_build = !BACKUPIT_BUILD_ID.is_empty() && source_app_id == BACKUPIT_BUILD_ID;
+        if available && !is_current_build && !download_url.is_empty() && last_update_url != download_url {
             #[cfg(feature = "flutter")]
             {
                 let mut m = HashMap::new();
