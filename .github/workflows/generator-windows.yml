@@ -1,5 +1,5 @@
 name: Custom Windows Client Generator
-run-name: Custom Windows Client Generator
+run-name: Custom Windows Client Generator (${{ inputs.version }})
 on: 
   workflow_dispatch:
     inputs:
@@ -451,6 +451,14 @@ jobs:
           # Windows: build RustDesk
           python3 .\build.py --portable --hwcodec --flutter --vram --skip-portable-pack
           mv ./flutter/build/windows/x64/runner/Release ./rustdesk
+
+      - name: Verify compiled RustDesk version
+        shell: pwsh
+        run: |
+          $output = (& .\rustdesk\rustdesk.exe --version 2>&1 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $output -notmatch ('(?m)^' + [regex]::Escape($env:VERSION) + '$')) {
+            throw "Compiled client reported '$output' but the selected version is '$env:VERSION'"
+          }
  
           # Download usbmmidd_v2.zip and extract it to ./rustdesk
           Invoke-WebRequest -Uri https://github.com/rustdesk-org/rdev/releases/download/usbmmidd_v2/usbmmidd_v2.zip -OutFile usbmmidd_v2.zip

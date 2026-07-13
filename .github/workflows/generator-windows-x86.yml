@@ -1,5 +1,5 @@
 name: Custom Windows x86 Client Generator
-run-name: Custom Windows x86 Client Generator
+run-name: Custom Windows x86 Client Generator (${{ inputs.version }})
 on: 
   workflow_dispatch:
     inputs:
@@ -343,6 +343,11 @@ jobs:
           cargo build --features inline,vram,hwcodec --release --bins
           mkdir -p ./Release
           mv ./target/release/rustdesk.exe ./Release/rustdesk.exe
+          version_output=$(./Release/rustdesk.exe --version 2>&1 | tr -d '\r' | tail -n 1)
+          if [[ "$version_output" != "$VERSION" ]]; then
+            echo "Compiled client reported '$version_output' but the selected version is '$VERSION'"
+            exit 1
+          fi
           curl -LJ -o ./Release/sciter.dll https://github.com/c-smile/sciter-sdk/raw/master/bin.win/x32/sciter.dll
           echo "output_folder=./Release" >> $GITHUB_OUTPUT
           curl -LJ -o ./usbmmidd_v2.zip https://github.com/rustdesk-org/rdev/releases/download/usbmmidd_v2/usbmmidd_v2.zip
