@@ -131,6 +131,16 @@ jobs:
           repository: rustdesk/rustdesk
           submodules: recursive
 
+      - name: Verify selected RustDesk version
+        if: ${{ env.VERSION != 'master' }}
+        shell: bash
+        run: |
+          actual="$(git describe --tags --exact-match 2>/dev/null || true)"
+          if [[ "$actual" != "$VERSION" ]]; then
+            echo "Selected RustDesk version $VERSION but checked out $actual"
+            exit 1
+          fi
+
       - name: Restore bridge files
         uses: actions/download-artifact@master
         with:
