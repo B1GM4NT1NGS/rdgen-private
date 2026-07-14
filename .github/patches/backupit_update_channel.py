@@ -76,6 +76,8 @@ const BACKUPIT_LAST_UPDATE_OPTION: &str = "{LAST_UPDATE_OPTION}";
 '''
     if old_check in text:
         text = text.replace(old_check, new_check, 1)
+    if "if is_custom_client() {\n        return;\n    }" in text:
+        raise RuntimeError("BackupIT update check is still disabled for custom clients")
     text = text.replace(
         "    if config::option2bool(keys::OPTION_ENABLE_CHECK_UPDATE, &opt) {\n",
         "    if !BACKUPIT_UPDATE_MANIFEST_URL.is_empty() || config::option2bool(keys::OPTION_ENABLE_CHECK_UPDATE, &opt) {\n",
@@ -171,6 +173,8 @@ def patch_flutter_update_trigger():
         raise RuntimeError(
             "Unable to enable BackupIT update startup trigger; custom-client guard changed upstream"
         )
+    if "if (!bind.isCustomClient())" in text:
+        raise RuntimeError("BackupIT update startup trigger is still disabled for custom clients")
     if "bind.mainGetSoftwareUpdateUrl();" not in text:
         raise RuntimeError("BackupIT update startup trigger is missing")
     write(path, text)
@@ -213,6 +217,8 @@ def patch_update_progress():
 '''
     if old in text:
         text = text.replace(old, new, 1)
+    if "if (!bind.isCustomClient() &&" in text:
+        raise RuntimeError("BackupIT update card is still hidden for custom clients")
 
     old_submit = '''      onSubmit: () {
         debugPrint('Downloaded, update to new version now');
