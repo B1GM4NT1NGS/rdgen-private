@@ -1,7 +1,7 @@
 import io
 from pathlib import Path
 from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.core.files.base import ContentFile
 import os
 import secrets
@@ -21,6 +21,7 @@ from urllib.parse import quote
 def env_default(name, fallback=""):
     return (os.environ.get(name) or fallback or "").strip()
 
+
 def api_server_url(value=""):
     target = str(value or "").strip()
     if not target:
@@ -28,6 +29,7 @@ def api_server_url(value=""):
     if target.lower().startswith(("http://", "https://")):
         return target.rstrip("/")
     return "http://" + target.rstrip("/")
+
 
 def backupit_update_manifest_url(api_server, channel):
     configured = env_default('BACKUPIT_UPDATE_MANIFEST_BASE', '')
@@ -38,6 +40,7 @@ def backupit_update_manifest_url(api_server, channel):
         return ""
     return base.rstrip("/") + "/updates/manifest/" + quote(channel, safe="")
 
+
 def public_gen_url(request):
     configured = str(_settings.GENURL or "").strip().rstrip("/")
     if configured:
@@ -46,11 +49,13 @@ def public_gen_url(request):
         return f"{_settings.PROTOCOL}://{configured}"
     return f"{_settings.PROTOCOL}://{request.get_host()}"
 
+
 def safe_app_name(value=""):
     appname = str(value or env_default('RDGEN_DEFAULT_APP_NAME', 'BackupIT')).strip()
     if not appname or appname.lower() == "rustdesk":
         return "BackupIT"
     return appname
+
 
 def safe_filename(value=""):
     filename = str(value or env_default('RDGEN_DEFAULT_FILE_NAME', 'BackupIT')).strip()
@@ -60,6 +65,7 @@ def safe_filename(value=""):
         filename = re.sub(r'[^\w\s-]', '_', filename).strip().replace(" ", "_")
         return filename or "BackupIT"
     return env_default('RDGEN_DEFAULT_FILE_NAME', 'BackupIT')
+
 
 def backupit_update_channel(platform, filename="", pass_approve_mode=""):
     platform = str(platform or "").strip()
@@ -72,356 +78,344 @@ def backupit_update_channel(platform, filename="", pass_approve_mode=""):
             return "windows-ask-pass"
     return platform
 
-def github_error_response(response):
+
+
+
+def generate_custom_client(params, full_url):
+    """
+    Core generation logic shared by web form and JSON API.
+
+    Args:
+        params: dict containing all configuration fields (keys match GenerateForm field names)
+        full_url: the full URL of this service (protocol + host)
+
+    Returns:
+        dict with 'success' key. On success: also includes 'uuid', 'filename', 'platform', 'log_url'.
+        On failure: includes 'error' and optionally 'status_code'.
+    """
+    user_secret = params.get('sh_secret_field', '')
+    selfhosted = bool(_settings.SH_SECRET and _settings.SH_SECRET == user_secret)
+    platform = params.get('platform', 'windows')
+    workflow_platform = 'windows' if platform == 'windows-admin' else platform
+    version = params.get('version', '1.4.9')
+    delayFix = params.get('delayFix', True)
+    cycleMonitor = params.get('cycleMonitor', False)
+    xOffline = params.get('xOffline', False)
+    hidecm = params.get('hidecm', False)
+    removeNewVersionNotif = params.get('removeNewVersionNotif', False)
+    server = params.get('serverIP', '')
+    key = params.get('key', '')
+    apiServer = params.get('apiServer', '')
+    urlLink = params.get('urlLink', '')
+    downloadLink = params.get('downloadLink', '')
+    if not server:
+        server = env_default('RDGEN_DEFAULT_SERVER', 'server.v22.online')
+    if not key:
+        key = env_default('RDGEN_DEFAULT_KEY', '')
+    if not apiServer:
+        apiServer = env_default('RDGEN_DEFAULT_API_SERVER', server + ':21114')
+    apiServer = api_server_url(apiServer)
+    if not urlLink:
+        urlLink = env_default('RDGEN_DEFAULT_URL_LINK', 'https://www.backupit.co.uk')
+    if not downloadLink:
+        downloadLink = env_default('RDGEN_DEFAULT_DOWNLOAD_LINK', 'https://www.backupit.co.uk')
+    direction = params.get('direction', 'both')
+    installation = params.get('installation', 'installationY')
+    settings = params.get('settings', 'settingsY')
+    appname = safe_app_name(params.get('appname', ''))
+    filename = safe_filename(params.get('exename', ''))
+    compname = params.get('compname', '')
+    if not compname:
+        compname = env_default('RDGEN_DEFAULT_COMPANY', 'Backup IT')
+    androidappid = params.get('androidappid', '')
+    if not androidappid:
+        androidappid = "com.carriez.flutter_hbb"
+    compname = compname.replace("&","\\&")
+    permPass = params.get('permanentPassword', '')
+    theme = params.get('theme', 'system')
+    themeDorO = params.get('themeDorO', 'default')
+    passApproveMode = params.get('passApproveMode', 'password-click')
+    update_channel = backupit_update_channel(platform, filename, passApproveMode)
+    backupitUpdateManifest = backupit_update_manifest_url(apiServer, update_channel)
+    denyLan = params.get('denyLan', False)
+    enableDirectIP = params.get('enableDirectIP', False)
+    autoClose = params.get('autoClose', False)
+    permissionsDorO = params.get('permissionsDorO', 'default')
+    permissionsType = params.get('permissionsType', 'custom')
+    enableKeyboard = params.get('enableKeyboard', True)
+    enableClipboard = params.get('enableClipboard', True)
+    enableFileTransfer = params.get('enableFileTransfer', True)
+    enableAudio = params.get('enableAudio', True)
+    enableTCP = params.get('enableTCP', True)
+    enableRemoteRestart = params.get('enableRemoteRestart', True)
+    enableRecording = params.get('enableRecording', True)
+    enableBlockingInput = params.get('enableBlockingInput', True)
+    enableRemoteModi = params.get('enableRemoteModi', False)
+    removeWallpaper = params.get('removeWallpaper', True)
+    defaultManual = params.get('defaultManual', '')
+    overrideManual = params.get('overrideManual', '')
+    enablePrinter = params.get('enablePrinter', True)
+    enableCamera = params.get('enableCamera', True)
+    enableTerminal = params.get('enableTerminal', True)
+
+    myuuid = str(uuid.uuid4())
+
     try:
-        payload = response.json()
-    except Exception:
-        payload = {}
-    message = payload.get("message") if isinstance(payload, dict) else ""
-    errors = payload.get("errors") if isinstance(payload, dict) else None
-    detail = message or response.text[:500] or "GitHub rejected the start request"
-    if errors:
-        detail = f"{detail}: {errors}"
-    return JsonResponse({
-        "error": "GitHub rejected the start request",
-        "github_status": response.status_code,
-        "github_message": detail,
-    }, status=500)
+        iconfile = params.get('iconfile')
+        if not iconfile:
+            iconfile = params.get('iconbase64')
+        iconlink_url, iconlink_uuid, iconlink_file = save_png(iconfile,myuuid,full_url,"icon.png")
+    except:
+        print("failed to get icon, using default")
+        iconlink_url = "false"
+        iconlink_uuid = "false"
+        iconlink_file = "false"
+    try:
+        logofile = params.get('logofile')
+        if not logofile:
+            logofile = params.get('logobase64')
+        logolink_url, logolink_uuid, logolink_file = save_png(logofile,myuuid,full_url,"logo.png")
+    except:
+        print("failed to get logo")
+        logolink_url = "false"
+        logolink_uuid = "false"
+        logolink_file = "false"
+    try:
+        privacyfile = params.get('privacyfile')
+        if not privacyfile:
+            privacyfile = params.get('privacybase64')
+        privacylink_url, privacylink_uuid, privacylink_file = save_png(privacyfile,myuuid,full_url,"privacy.png")
+    except:
+        print("failed to get logo")
+        privacylink_url = "false"
+        privacylink_uuid = "false"
+        privacylink_file = "false"
 
-def generator_view(request):
-    if request.method == 'POST':
-        form = GenerateForm(request.POST, request.FILES)
-        if form.is_valid():
-            user_secret = form.cleaned_data['sh_secret_field']
-            platform = form.cleaned_data['platform']
-            update_channel = platform
-            workflow_platform = 'windows' if platform == 'windows-admin' else platform
-            workflow_platform = 'windows' if platform == 'windows-admin' else platform
-            selfhosted = bool(_settings.SH_SECRET and _settings.SH_SECRET == user_secret)
-            version = form.cleaned_data['version']
-            delayFix = form.cleaned_data['delayFix']
-            cycleMonitor = form.cleaned_data['cycleMonitor']
-            xOffline = form.cleaned_data['xOffline']
-            hidecm = form.cleaned_data['hidecm']
-            removeNewVersionNotif = form.cleaned_data['removeNewVersionNotif']
-            server = form.cleaned_data['serverIP']
-            key = form.cleaned_data['key']
-            apiServer = form.cleaned_data['apiServer']
-            urlLink = form.cleaned_data['urlLink']
-            downloadLink = form.cleaned_data['downloadLink']
-            if not server:
-                server = env_default('RDGEN_DEFAULT_SERVER', 'server.v22.online')
-            if not key:
-                key = env_default('RDGEN_DEFAULT_KEY', '')
-            if not apiServer:
-                apiServer = env_default('RDGEN_DEFAULT_API_SERVER', server + ":21114")
-            apiServer = api_server_url(apiServer)
-            if not urlLink:
-                urlLink = env_default('RDGEN_DEFAULT_URL_LINK', "https://www.backupit.co.uk")
-            if not downloadLink:
-                downloadLink = env_default('RDGEN_DEFAULT_DOWNLOAD_LINK', "https://www.backupit.co.uk")
-            direction = form.cleaned_data['direction']
-            installation = form.cleaned_data['installation']
-            settings = form.cleaned_data['settings']
-            appname = safe_app_name(form.cleaned_data['appname'])
-            filename = safe_filename(form.cleaned_data['exename'])
-            compname = form.cleaned_data['compname']
-            if not compname:
-                compname = env_default('RDGEN_DEFAULT_COMPANY', 'Backup IT')
-            androidappid = form.cleaned_data['androidappid']
-            if not androidappid:
-                androidappid = "com.carriez.flutter_hbb"
-            compname = compname.replace("&","\\&")
-            permPass = form.cleaned_data['permanentPassword']
-            theme = form.cleaned_data['theme']
-            themeDorO = form.cleaned_data['themeDorO']
-            #runasadmin = form.cleaned_data['runasadmin']
-            passApproveMode = form.cleaned_data['passApproveMode']
-            update_channel = backupit_update_channel(platform, filename, passApproveMode)
-            backupitUpdateManifest = backupit_update_manifest_url(apiServer, update_channel)
-            denyLan = form.cleaned_data['denyLan']
-            enableDirectIP = form.cleaned_data['enableDirectIP']
-            #ipWhitelist = form.cleaned_data['ipWhitelist']
-            autoClose = form.cleaned_data['autoClose']
-            permissionsDorO = form.cleaned_data['permissionsDorO']
-            permissionsType = form.cleaned_data['permissionsType']
-            enableKeyboard = form.cleaned_data['enableKeyboard']
-            enableClipboard = form.cleaned_data['enableClipboard']
-            enableFileTransfer = form.cleaned_data['enableFileTransfer']
-            enableAudio = form.cleaned_data['enableAudio']
-            enableTCP = form.cleaned_data['enableTCP']
-            enableRemoteRestart = form.cleaned_data['enableRemoteRestart']
-            enableRecording = form.cleaned_data['enableRecording']
-            enableBlockingInput = form.cleaned_data['enableBlockingInput']
-            enableRemoteModi = form.cleaned_data['enableRemoteModi']
-            removeWallpaper = form.cleaned_data['removeWallpaper']
-            defaultManual = form.cleaned_data['defaultManual']
-            overrideManual = form.cleaned_data['overrideManual']
-            enablePrinter = form.cleaned_data['enablePrinter']
-            enableCamera = form.cleaned_data['enableCamera']
-            enableTerminal = form.cleaned_data['enableTerminal']
-
-            if not all(char.isascii() for char in appname):
-                appname = env_default('RDGEN_DEFAULT_APP_NAME', 'BackupIT')
-            myuuid = str(uuid.uuid4())
-            full_url = public_gen_url(request)
-            try:
-                iconfile = form.cleaned_data.get('iconfile')
-                if not iconfile:
-                    iconfile = form.cleaned_data.get('iconbase64')
-                iconlink_url, iconlink_uuid, iconlink_file = save_png(iconfile,myuuid,full_url,"icon.png")
-            except:
-                print("failed to get icon, using default")
-                iconlink_url = "false"
-                iconlink_uuid = "false"
-                iconlink_file = "false"
-            try:
-                logofile = form.cleaned_data.get('logofile')
-                if not logofile:
-                    logofile = form.cleaned_data.get('logobase64')
-                logolink_url, logolink_uuid, logolink_file = save_png(logofile,myuuid,full_url,"logo.png")
-            except:
-                print("failed to get logo")
-                logolink_url = "false"
-                logolink_uuid = "false"
-                logolink_file = "false"
-            try:
-                privacyfile = form.cleaned_data.get('privacyfile')
-                if not privacyfile:
-                    privacyfile = form.cleaned_data.get('privacybase64')
-                privacylink_url, privacylink_uuid, privacylink_file = save_png(privacyfile,myuuid,full_url,"privacy.png")
-            except:
-                print("failed to get logo")
-                privacylink_url = "false"
-                privacylink_uuid = "false"
-                privacylink_file = "false"
-
-            ###create the custom.txt json here and send in as inputs below
-            decodedCustom = {}
-            if direction != "Both":
-                decodedCustom['conn-type'] = direction
-            if installation == "installationN":
-                decodedCustom['disable-installation'] = 'Y'
-            if settings == "settingsN":
-                decodedCustom['disable-settings'] = 'Y'
-            if appname and appname.lower() != "rustdesk":
-                decodedCustom['app-name'] = appname
-            decodedCustom['override-settings'] = {}
-            decodedCustom['default-settings'] = {}
-            decodedCustom['override-settings']['custom-rendezvous-server'] = server
-            decodedCustom['override-settings']['relay-server'] = server
-            decodedCustom['override-settings']['api-server'] = apiServer
-            if key:
-                decodedCustom['override-settings']['key'] = key
-            if permPass != "":
-                decodedCustom['password'] = permPass
-            if theme != "system":
-                if themeDorO == "default":
-                    if platform == "windows-x86":
-                        decodedCustom['default-settings']['allow-darktheme'] = 'Y' if theme == "dark" else 'N'
-                    else:
-                        decodedCustom['default-settings']['theme'] = theme
-                elif themeDorO == "override":
-                    if platform == "windows-x86":
-                        decodedCustom['override-settings']['allow-darktheme'] = 'Y' if theme == "dark" else 'N'
-                    else:
-                        decodedCustom['override-settings']['theme'] = theme
-            decodedCustom['enable-lan-discovery'] = 'N' if denyLan else 'Y'
-            #decodedCustom['direct-server'] = 'Y' if enableDirectIP else 'N'
-            decodedCustom['allow-auto-disconnect'] = 'Y' if autoClose else 'N'
-            if permissionsDorO == "default":
-                decodedCustom['default-settings']['access-mode'] = permissionsType
-                decodedCustom['default-settings']['enable-keyboard'] = 'Y' if enableKeyboard else 'N'
-                decodedCustom['default-settings']['enable-clipboard'] = 'Y' if enableClipboard else 'N'
-                decodedCustom['default-settings']['enable-file-transfer'] = 'Y' if enableFileTransfer else 'N'
-                decodedCustom['default-settings']['enable-audio'] = 'Y' if enableAudio else 'N'
-                decodedCustom['default-settings']['enable-tunnel'] = 'Y' if enableTCP else 'N'
-                decodedCustom['default-settings']['enable-remote-restart'] = 'Y' if enableRemoteRestart else 'N'
-                decodedCustom['default-settings']['enable-record-session'] = 'Y' if enableRecording else 'N'
-                decodedCustom['default-settings']['enable-block-input'] = 'Y' if enableBlockingInput else 'N'
-                decodedCustom['default-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
-                decodedCustom['default-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
-                decodedCustom['default-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
-                decodedCustom['default-settings']['approve-mode'] = passApproveMode
-                decodedCustom['default-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
-                decodedCustom['default-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
-                decodedCustom['default-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'
-                decodedCustom['default-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
-                decodedCustom['default-settings']['enable-terminal'] = 'Y' if enableTerminal else 'N'
+    ###create the custom.txt json here and send in as inputs below
+    decodedCustom = {}
+    if direction != "Both":
+        decodedCustom['conn-type'] = direction
+    if installation == "installationN":
+        decodedCustom['disable-installation'] = 'Y'
+    if settings == "settingsN":
+        decodedCustom['disable-settings'] = 'Y'
+    if appname.upper != "rustdesk".upper and appname != "":
+        decodedCustom['app-name'] = appname
+    decodedCustom['override-settings'] = {}
+    decodedCustom['default-settings'] = {}
+    decodedCustom['override-settings']['custom-rendezvous-server'] = server
+    decodedCustom['override-settings']['relay-server'] = server
+    decodedCustom['override-settings']['api-server'] = apiServer
+    if key:
+        decodedCustom['override-settings']['key'] = key
+    if permPass != "":
+        decodedCustom['password'] = permPass
+    if theme != "system":
+        if themeDorO == "default":
+            if platform == "windows-x86":
+                decodedCustom['default-settings']['allow-darktheme'] = 'Y' if theme == "dark" else 'N'
             else:
-                decodedCustom['override-settings']['access-mode'] = permissionsType
-                decodedCustom['override-settings']['enable-keyboard'] = 'Y' if enableKeyboard else 'N'
-                decodedCustom['override-settings']['enable-clipboard'] = 'Y' if enableClipboard else 'N'
-                decodedCustom['override-settings']['enable-file-transfer'] = 'Y' if enableFileTransfer else 'N'
-                decodedCustom['override-settings']['enable-audio'] = 'Y' if enableAudio else 'N'
-                decodedCustom['override-settings']['enable-tunnel'] = 'Y' if enableTCP else 'N'
-                decodedCustom['override-settings']['enable-remote-restart'] = 'Y' if enableRemoteRestart else 'N'
-                decodedCustom['override-settings']['enable-record-session'] = 'Y' if enableRecording else 'N'
-                decodedCustom['override-settings']['enable-block-input'] = 'Y' if enableBlockingInput else 'N'
-                decodedCustom['override-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
-                decodedCustom['override-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
-                decodedCustom['override-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
-                decodedCustom['override-settings']['approve-mode'] = passApproveMode
-                decodedCustom['override-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
-                decodedCustom['override-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
-                decodedCustom['override-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'
-                decodedCustom['override-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
-                decodedCustom['override-settings']['enable-terminal'] = 'Y' if enableTerminal else 'N'
+                decodedCustom['default-settings']['theme'] = theme
+        elif themeDorO == "override":
+            if platform == "windows-x86":
+                decodedCustom['override-settings']['allow-darktheme'] = 'Y' if theme == "dark" else 'N'
+            else:
+                decodedCustom['override-settings']['theme'] = theme
+    decodedCustom['enable-lan-discovery'] = 'N' if denyLan else 'Y'
+    #decodedCustom['direct-server'] = 'Y' if enableDirectIP else 'N'
+    decodedCustom['allow-auto-disconnect'] = 'Y' if autoClose else 'N'
+    if permissionsDorO == "default":
+        decodedCustom['default-settings']['access-mode'] = permissionsType
+        decodedCustom['default-settings']['enable-keyboard'] = 'Y' if enableKeyboard else 'N'
+        decodedCustom['default-settings']['enable-clipboard'] = 'Y' if enableClipboard else 'N'
+        decodedCustom['default-settings']['enable-file-transfer'] = 'Y' if enableFileTransfer else 'N'
+        decodedCustom['default-settings']['enable-audio'] = 'Y' if enableAudio else 'N'
+        decodedCustom['default-settings']['enable-tunnel'] = 'Y' if enableTCP else 'N'
+        decodedCustom['default-settings']['enable-remote-restart'] = 'Y' if enableRemoteRestart else 'N'
+        decodedCustom['default-settings']['enable-record-session'] = 'Y' if enableRecording else 'N'
+        decodedCustom['default-settings']['enable-block-input'] = 'Y' if enableBlockingInput else 'N'
+        decodedCustom['default-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
+        decodedCustom['default-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
+        decodedCustom['default-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
+        decodedCustom['default-settings']['approve-mode'] = passApproveMode
+        decodedCustom['default-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
+        decodedCustom['default-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
+        decodedCustom['default-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'
+        decodedCustom['default-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
+        decodedCustom['default-settings']['enable-terminal'] = 'Y' if enableTerminal else 'N'
+    else:
+        decodedCustom['override-settings']['access-mode'] = permissionsType
+        decodedCustom['override-settings']['enable-keyboard'] = 'Y' if enableKeyboard else 'N'
+        decodedCustom['override-settings']['enable-clipboard'] = 'Y' if enableClipboard else 'N'
+        decodedCustom['override-settings']['enable-file-transfer'] = 'Y' if enableFileTransfer else 'N'
+        decodedCustom['override-settings']['enable-audio'] = 'Y' if enableAudio else 'N'
+        decodedCustom['override-settings']['enable-tunnel'] = 'Y' if enableTCP else 'N'
+        decodedCustom['override-settings']['enable-remote-restart'] = 'Y' if enableRemoteRestart else 'N'
+        decodedCustom['override-settings']['enable-record-session'] = 'Y' if enableRecording else 'N'
+        decodedCustom['override-settings']['enable-block-input'] = 'Y' if enableBlockingInput else 'N'
+        decodedCustom['override-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
+        decodedCustom['override-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
+        decodedCustom['override-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
+        decodedCustom['override-settings']['approve-mode'] = passApproveMode
+        decodedCustom['override-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
+        decodedCustom['override-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
+        decodedCustom['override-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'
+        decodedCustom['override-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
+        decodedCustom['override-settings']['enable-terminal'] = 'Y' if enableTerminal else 'N'
 
-            if hidecm:
-                decodedCustom['override-settings']['verification-method'] = 'use-permanent-password'
-                decodedCustom['override-settings']['approve-mode'] = 'password'
-                decodedCustom['override-settings']['allow-hide-cm'] = 'Y'
+    if hidecm:
+        decodedCustom['override-settings']['verification-method'] = 'use-permanent-password'
+        decodedCustom['override-settings']['approve-mode'] = 'password'
+        decodedCustom['override-settings']['allow-hide-cm'] = 'Y'
 
-            for line in defaultManual.splitlines():
-                k, value = line.split('=')
+    if defaultManual:
+        for line in defaultManual.splitlines():
+            if '=' in line:
+                k, value = line.split('=', 1)
                 decodedCustom['default-settings'][k.strip()] = value.strip()
 
-            for line in overrideManual.splitlines():
-                k, value = line.split('=')
+    if overrideManual:
+        for line in overrideManual.splitlines():
+            if '=' in line:
+                k, value = line.split('=', 1)
                 decodedCustom['override-settings'][k.strip()] = value.strip()
-            
-            decodedCustomJson = json.dumps(decodedCustom)
+    
+    decodedCustomJson = json.dumps(decodedCustom)
 
-            string_bytes = decodedCustomJson.encode("ascii")
-            base64_bytes = base64.b64encode(string_bytes)
-            encodedCustom = base64_bytes.decode("ascii")
+    string_bytes = decodedCustomJson.encode("ascii")
+    base64_bytes = base64.b64encode(string_bytes)
+    encodedCustom = base64_bytes.decode("ascii")
 
-            # #github limits inputs to 10, so lump extras into one with json
-            # extras = {}
-            # extras['genurl'] = _settings.GENURL
-            # #extras['runasadmin'] = runasadmin
-            # extras['urlLink'] = urlLink
-            # extras['downloadLink'] = downloadLink
-            # extras['delayFix'] = 'true' if delayFix else 'false'
-            # extras['rdgen'] = 'true'
-            # extras['xOffline'] = 'true' if xOffline else 'false'
-            # extras['removeNewVersionNotif'] = 'true' if removeNewVersionNotif else 'false'
-            # extras['compname'] = compname
-            # extras['androidappid'] = androidappid
-            # extra_input = json.dumps(extras)
+    ####from here run the github action, we need user, repo, access token.
+    workflows = {
+        'windows': 'generator-windows.yml',
+        'windows-x86': 'generator-windows-x86.yml',
+        'windows-admin': 'generator-windows.yml',
+        'linux': 'generator-linux.yml',
+        'android': 'generator-android.yml',
+        'macos': 'generator-macos.yml',
+    }
+    workflow_file = workflows.get(workflow_platform, workflows['windows'])
+    if workflow_platform == 'windows' and selfhosted:
+        workflow_file = 'sh-generator-windows.yml'
+    url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/'+workflow_file+'/dispatches'
 
-            ####from here run the github action, we need user, repo, access token.
-            workflows = {
-                'windows': 'generator-windows.yml',
-                'windows-x86': 'generator-windows-x86.yml',
-                'windows-admin': 'generator-windows.yml',
-                'linux': 'generator-linux.yml',
-                'android': 'generator-android.yml',
-                'macos': 'generator-macos.yml',
+    inputs_raw = {
+        "server":server,
+        "key":key,
+        "apiServer":apiServer,
+        "custom":encodedCustom,
+        "uuid":myuuid,
+        "iconlink_url":iconlink_url,
+        "iconlink_uuid":iconlink_uuid,
+        "iconlink_file":iconlink_file,
+        "logolink_url":logolink_url,
+        "logolink_uuid":logolink_uuid,
+        "logolink_file":logolink_file,
+        "privacylink_url":privacylink_url,
+        "privacylink_uuid":privacylink_uuid,
+        "privacylink_file":privacylink_file,
+        "appname":appname,
+        "genurl":_settings.GENURL,
+        "urlLink":urlLink,
+        "downloadLink":downloadLink,
+        "backupitUpdateManifest": backupitUpdateManifest,
+        "backupitUpdateChannel": update_channel,
+        "delayFix": 'true' if delayFix else 'false',
+        "cycleMonitor": 'true' if cycleMonitor else 'false',
+        "rdgen":'true',
+        "xOffline": 'true' if xOffline else 'false',
+        "removeNewVersionNotif": 'true' if removeNewVersionNotif else 'false',
+        "compname": compname,
+        "androidappid":androidappid,
+        "filename":filename
+    }
+
+    temp_json_path = f"data_{uuid.uuid4()}.json"
+    zip_filename = f"secrets_{uuid.uuid4()}.zip"
+    zip_path = "temp_zips/%s" % (zip_filename)
+    Path("temp_zips").mkdir(parents=True, exist_ok=True)
+
+    with open(temp_json_path, "w") as f:
+        json.dump(inputs_raw, f)
+
+    with pyzipper.AESZipFile(zip_path, 'w', compression=pyzipper.ZIP_LZMA, encryption=pyzipper.WZ_AES) as zf:
+        zf.setpassword(_settings.ZIP_PASSWORD.encode())
+        zf.write(temp_json_path, arcname="secrets.json")
+
+    if os.path.exists(temp_json_path):
+        os.remove(temp_json_path)
+
+    zipJson = {}
+    zipJson['url'] = full_url
+    zipJson['file'] = zip_filename
+
+    zip_url = json.dumps(zipJson)
+
+    data = {
+        "ref":_settings.GHBRANCH,
+        "inputs":{
+            "version":version,
+            "zip_url":zip_url
+        },
+        "return_run_details": True
+    } 
+    headers = {
+        'Accept':  'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer '+_settings.GHBEARER,
+        'X-GitHub-Api-Version': '2026-03-10'
+    }
+    new_github_run = GithubRun(
+        uuid=myuuid,
+        status="Starting generator...please wait"
+    )
+    try:
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code == 204 or response.status_code == 200:
+            github_data = response.json()
+            print(github_data)
+            new_github_run.github_run_id = github_data.get('workflow_run_id')
+            new_github_run.status = "in_progress"
+            new_github_run.save()
+
+            return {
+                "success": True,
+                "uuid": myuuid,
+                "filename": filename,
+                "platform": platform,
+                "log_url": github_data.get('html_url')
             }
-            workflow_file = workflows.get(workflow_platform, workflows['windows'])
-            if workflow_platform == 'windows' and selfhosted:
-                workflow_file = 'sh-generator-windows.yml'
-            url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/'+workflow_file+'/dispatches'
-
-            #url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rustdesk/actions/workflows/test.yml/dispatches'  
-            inputs_raw = {
-                "server":server,
-                "key":key,
-                "apiServer":apiServer,
-                "custom":encodedCustom,
-                "uuid":myuuid,
-                "iconlink_url":iconlink_url,
-                "iconlink_uuid":iconlink_uuid,
-                "iconlink_file":iconlink_file,
-                "logolink_url":logolink_url,
-                "logolink_uuid":logolink_uuid,
-                "logolink_file":logolink_file,
-                "privacylink_url":privacylink_url,
-                "privacylink_uuid":privacylink_uuid,
-                "privacylink_file":privacylink_file,
-                "appname":appname,
-                "genurl":_settings.GENURL,
-                "urlLink":urlLink,
-                "downloadLink":downloadLink,
-                "backupitUpdateManifest": backupitUpdateManifest,
-                "backupitUpdateChannel": update_channel,
-                "delayFix": 'true' if delayFix else 'false',
-                "cycleMonitor": 'true' if cycleMonitor else 'false',
-                "rdgen":'true',
-                "xOffline": 'true' if xOffline else 'false',
-                "removeNewVersionNotif": 'true' if removeNewVersionNotif else 'false',
-                "compname": compname,
-                "androidappid":androidappid,
-                "filename":filename
+        else:
+            return {
+                "success": False,
+                "error": "GitHub rejected the start request",
+                "status_code": 500
             }
-
-            temp_json_path = f"data_{uuid.uuid4()}.json"
-            zip_filename = f"secrets_{uuid.uuid4()}.zip"
-            zip_path = "temp_zips/%s" % (zip_filename)
-            Path("temp_zips").mkdir(parents=True, exist_ok=True)
-
-            with open(temp_json_path, "w") as f:
-                json.dump(inputs_raw, f)
-
-            with pyzipper.AESZipFile(zip_path, 'w', compression=pyzipper.ZIP_LZMA, encryption=pyzipper.WZ_AES) as zf:
-                zf.setpassword(_settings.ZIP_PASSWORD.encode())
-                zf.write(temp_json_path, arcname="secrets.json")
-
-            if os.path.exists(temp_json_path):
-                os.remove(temp_json_path)
-
-            zipJson = {}
-            zipJson['url'] = full_url
-            zipJson['file'] = zip_filename
-
-            zip_url = json.dumps(zipJson)
-
-            data = {
-                "ref":_settings.GHBRANCH,
-                "inputs":{
-                    "version":version,
-                    "zip_url":zip_url
-                }
-            } 
-            #print(data)
-            headers = {
-                'Accept':  'application/vnd.github+json',
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer '+_settings.GHBEARER,
-                'X-GitHub-Api-Version': '2026-03-10'
-            }
-            new_github_run = GithubRun(
-                uuid=myuuid,
-                status="Starting generator...please wait"
-            )
-            try:
-                response = requests.post(url, json=data, headers=headers)
-                #print(response)
-                if response.status_code == 204 or response.status_code == 200:
-                    try:
-                        github_data = response.json() if response.content else {}
-                    except Exception:
-                        github_data = {}
-                    print(github_data)
-                    new_github_run.github_run_id = github_data.get('workflow_run_id')
-                    new_github_run.status = "in_progress"
-                    new_github_run.save()
-
-                    workflow_file = url.split('/workflows/', 1)[1].split('/dispatches', 1)[0]
-                    log_url = github_data.get('html_url') or f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions/workflows/{workflow_file}"
-                    return render(request, 'waiting.html', {'filename':filename, 'uuid':myuuid, 'status':"Starting generator...please wait", 'platform':platform, 'log_url': log_url})
-                else:
-                    #new_github_run.delete()
-                    return github_error_response(response)
-            except Exception as e:
-                #new_github_run.delete()
-                return JsonResponse({"error": f"Connection error: {str(e)}"}, status=500)
-    else:
-        form = GenerateForm()
-    #return render(request, 'maintenance.html')
-    return render(request, 'generator.html', {'form': form})
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Connection error: {str(e)}",
+            "status_code": 500
+        }
 
 
-from django.shortcuts import render, get_object_or_404
-from django.db.models import Q
+def _get_run_status(uuid_val):
+    """
+    Core status-check logic shared by web form and JSON API.
 
-def check_for_file(request):
-    filename = request.GET.get('filename')
-    uuid = request.GET.get('uuid')
-    platform = request.GET.get('platform')
-    gh_run = get_object_or_404(GithubRun, uuid=uuid)
+    Args:
+        uuid_val: the UUID string of the generation run
+
+    Returns:
+        dict with 'found', 'status', 'github_log_url', and optionally 'gh_run'.
+        If not found, 'found' is False.
+    """
+    try:
+        gh_run = GithubRun.objects.get(uuid=uuid_val)
+    except GithubRun.DoesNotExist:
+        return {"found": False}
+
     github_log_url = f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions/runs/{gh_run.github_run_id}"
 
     if gh_run.status not in ['success', 'failure', 'cancelled', 'timed_out', 'skipped']:
@@ -441,7 +435,51 @@ def check_for_file(request):
                     gh_run.save()
         except Exception as e:
             print(f"Error checking GitHub: {e}")
-    
+
+    return {
+        "found": True,
+        "status": gh_run.status,
+        "github_log_url": github_log_url,
+        "gh_run": gh_run
+    }
+
+
+def generator_view(request):
+    if request.method == 'POST':
+        form = GenerateForm(request.POST, request.FILES)
+        if form.is_valid():
+            params = form.cleaned_data
+            full_url = public_gen_url(request)
+            result = generate_custom_client(params, full_url)
+            if result['success']:
+                return render(request, 'waiting.html', {
+                    'filename': result['filename'],
+                    'uuid': result['uuid'],
+                    'status': "Starting generator...please wait",
+                    'platform': result['platform'],
+                    'log_url': result['log_url']
+                })
+            else:
+                return JsonResponse({"error": result['error']}, status=result.get('status_code', 500))
+    else:
+        form = GenerateForm()
+    #return render(request, 'maintenance.html')
+    return render(request, 'generator.html', {'form': form})
+
+
+def check_for_file(request):
+    filename = request.GET.get('filename')
+    uuid = request.GET.get('uuid')
+    platform = request.GET.get('platform')
+
+    result = _get_run_status(uuid)
+    if not result['found']:
+        from django.http import Http404
+        raise Http404("Run not found")
+
+    gh_run = result['gh_run']
+    github_log_url = result['github_log_url']
+
     if gh_run.status == "success":
         return render(request, 'generated.html', {
             'filename': filename, 
@@ -550,15 +588,13 @@ def startgh(request):
     #print(request)
     data_ = json.loads(request.body)
     ####from here run the github action, we need user, repo, access token.
-    platform = data_.get('platform') or 'windows'
-    workflow = 'generator-' + platform + '.yml'
-    url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/'+workflow+'/dispatches'  
+    url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/generator-'+data_.get('platform')+'.yml/dispatches'  
     data = {
         "ref": _settings.GHBRANCH,
         "inputs":{
-            "server":data_.get('server') or env_default('RDGEN_DEFAULT_SERVER', 'server.v22.online'),
-            "key":data_.get('key') or env_default('RDGEN_DEFAULT_KEY', ''),
-            "apiServer":api_server_url(data_.get('apiServer') or env_default('RDGEN_DEFAULT_API_SERVER', 'server.v22.online:21114')),
+            "server":data_.get('server'),
+            "key":data_.get('key'),
+            "apiServer":data_.get('apiServer'),
             "custom":data_.get('custom'),
             "uuid":data_.get('uuid'),
             "iconlink":data_.get('iconlink'),
@@ -616,71 +652,37 @@ def save_custom_client(request):
     return HttpResponse("File saved successfully!")
 
 def cleanup_secrets(request):
-    if not zip_request_authorized(request):
-        return HttpResponse("Not found", status=404)
-
+    # Pass the UUID as a query param or in JSON body
     data = json.loads(request.body)
     my_uuid = data.get('uuid')
-    zip_filename = safe_temp_zip_name(data.get('filename'))
     
-    if not my_uuid and not zip_filename:
-        return HttpResponse("Missing cleanup target", status=400)
+    if not my_uuid:
+        return HttpResponse("Missing UUID", status=400)
 
+    # 1. Find the files in your temp directory matching the UUID
     temp_dir = os.path.join('temp_zips')
-    candidates = []
-
-    if zip_filename:
-        candidates.append(zip_filename)
-    elif os.path.isdir(temp_dir):
-        for filename in os.listdir(temp_dir):
-            if my_uuid in filename and filename.endswith('.zip'):
-                candidates.append(filename)
-
-    for filename in candidates:
-        file_path = os.path.join(temp_dir, filename)
-        try:
-            if os.path.exists(file_path):
+    
+    # We look for any file starting with 'secrets_' and containing the uuid
+    for filename in os.listdir(temp_dir):
+        if my_uuid in filename and filename.endswith('.zip'):
+            file_path = os.path.join(temp_dir, filename)
+            try:
                 os.remove(file_path)
                 print(f"Successfully deleted {file_path}")
-        except OSError as e:
-            print(f"Error deleting file: {e}")
+            except OSError as e:
+                print(f"Error deleting file: {e}")
 
     return HttpResponse("Cleanup successful", status=200)
 
-
-def zip_request_authorized(request):
-    expected = getattr(_settings, "ZIP_PASSWORD", "") or ""
-    auth = request.META.get("HTTP_AUTHORIZATION", "")
-    token = ""
-    if auth.lower().startswith("bearer "):
-        token = auth[7:].strip()
-    token = token or request.META.get("HTTP_X_ZIP_TOKEN", "")
-    return bool(expected) and secrets.compare_digest(str(token), str(expected))
-
-
-def safe_temp_zip_name(filename):
-    filename = os.path.basename(str(filename or ""))
-    if not filename.startswith("secrets_") or not filename.endswith(".zip"):
-        return ""
-    if not re.fullmatch(r"secrets_[A-Za-z0-9._-]+\.zip", filename):
-        return ""
-    return filename
-
 def get_zip(request):
-    if not zip_request_authorized(request):
-        return HttpResponse("Not found", status=404)
-    filename = safe_temp_zip_name(request.GET.get('filename'))
-    if not filename:
-        return HttpResponse("Not found", status=404)
+    filename = request.GET['filename']
     base_dir = os.path.abspath('temp_zips')
     file_path = os.path.abspath(os.path.join(base_dir, filename))
     if not file_path.startswith(base_dir + os.sep):
-        return HttpResponse("Not found", status=404)
-    if not os.path.exists(file_path):
-        return HttpResponse("Not found", status=404)
+        return HttpResponseForbidden("Invalid filename")
     with open(file_path, 'rb') as file:
         response = HttpResponse(file, headers={
-            'Content-Type': 'application/zip',
+            'Content-Type': 'application/vnd.microsoft.portable-executable',
             'Content-Disposition': f'attachment; filename="{filename}"'
         })
 
