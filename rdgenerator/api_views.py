@@ -1,7 +1,7 @@
 import json
 from django.http import JsonResponse
 from django.conf import settings as _settings
-from .views import generate_custom_client, _get_run_status, public_gen_url
+from .views import generate_custom_client, _get_run_status, public_gen_url, public_gen_url
 from .forms import GenerateForm
 
 
