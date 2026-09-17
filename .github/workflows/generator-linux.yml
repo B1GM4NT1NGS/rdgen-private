@@ -283,6 +283,13 @@ jobs:
             echo -n "${{ env.custom }}" | cat > ./custom_.txt
             # sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
             sed -i -e 's|https://admin.rustdesk.com|${{ env.apiServer }}|' ./src/common.rs
+
+      - name: Enforce BackupIT Ask and Pass approval
+        if: env.backupitRequirePasswordAndClick == 'true'
+        shell: bash
+        run: |
+          curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_require_password_and_click.py?ref=${{ github.ref_name }}" -o backupit_require_password_and_click.py
+          python backupit_require_password_and_click.py
           
       - name: change url to custom
         if: env.urlLink != 'https://rustdesk.com'

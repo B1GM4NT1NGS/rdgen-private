@@ -90,6 +90,15 @@ def validate_generate_params(data):
     for field in OPTIONAL_STR_FIELDS:
         cleaned[field] = data.get(field, '')
 
+    if (
+        cleaned.get('passApproveMode') == 'password-click'
+        and not cleaned.get('hidecm')
+        and not cleaned.get('permanentPassword')
+    ):
+        errors['permanentPassword'] = (
+            'A permanent password is required when remote approval is also required.'
+        )
+
     # File fields are not used in API mode (base64 fields are used instead)
     cleaned['iconfile'] = None
     cleaned['logofile'] = None

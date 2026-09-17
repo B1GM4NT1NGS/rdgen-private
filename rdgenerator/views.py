@@ -327,6 +327,7 @@ def generate_custom_client(params, full_url):
         "downloadLink":downloadLink,
         "backupitUpdateManifest": backupitUpdateManifest,
         "backupitUpdateChannel": update_channel,
+        "backupitRequirePasswordAndClick": 'true' if passApproveMode == 'password-click' and not hidecm else 'false',
         "delayFix": 'true' if delayFix else 'false',
         "cycleMonitor": 'true' if cycleMonitor else 'false',
         "rdgen":'true',

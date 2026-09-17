@@ -111,7 +111,11 @@ class GenerateForm(forms.Form):
     themeDorO = forms.ChoiceField(choices=[('default', 'Default'),('override', 'Override')], initial='default')
 
     #Security
-    passApproveMode = forms.ChoiceField(choices=[('password','Accept sessions via password'),('click','Accept sessions via click'),('password-click','Accepts sessions via both')],initial='password-click')
+    passApproveMode = forms.ChoiceField(choices=[
+        ('password', 'Accept sessions via password'),
+        ('click', 'Accept sessions via click'),
+        ('password-click', 'Require password, then remote approval'),
+    ], initial='password-click')
     permanentPassword = forms.CharField(widget=forms.PasswordInput(), required=False)
     #runasadmin = forms.ChoiceField(choices=[('false','No'),('true','Yes')], initial='false')
     denyLan = forms.BooleanField(initial=False, required=False)
@@ -135,6 +139,19 @@ class GenerateForm(forms.Form):
     enablePrinter = forms.BooleanField(initial=True, required=False)
     enableCamera = forms.BooleanField(initial=True, required=False)
     enableTerminal = forms.BooleanField(initial=True, required=False)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if (
+            cleaned_data.get('passApproveMode') == 'password-click'
+            and not cleaned_data.get('hidecm')
+            and not cleaned_data.get('permanentPassword')
+        ):
+            self.add_error(
+                'permanentPassword',
+                'A permanent password is required when remote approval is also required.',
+            )
+        return cleaned_data
 
     #Other
     removeWallpaper = forms.BooleanField(initial=True, required=False)

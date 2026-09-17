@@ -286,6 +286,13 @@ jobs:
             python backupit_terminal_cm_hidden.py
             Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_update_channel.py?ref=${{ github.ref_name }}" -OutFile backupit_update_channel.py
             python backupit_update_channel.py
+
+      - name: Enforce BackupIT Ask and Pass approval
+        if: env.backupitRequirePasswordAndClick == 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_require_password_and_click.py?ref=${{ github.ref_name }}" -OutFile backupit_require_password_and_click.py
+          python backupit_require_password_and_click.py
           
       - name: magick stuff
         if: ${{ env.iconlink_url != 'false' }}
