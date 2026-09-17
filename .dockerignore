@@ -5,8 +5,7 @@ README.md
 setup.md
 LICENSE
 
-# Git stuff
-.git
+# GitHub workflow files are not needed in the runtime image.
 .github
 .gitignore
 
@@ -14,3 +13,7 @@ LICENSE
 *.pyc
 .venv
 db.sqlite3
+exe
+png
+temp_zips
+__pycache__
