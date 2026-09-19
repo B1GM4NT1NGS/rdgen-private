@@ -209,7 +209,10 @@ jobs:
         shell: bash
         run: |
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./src/ui/index.tis
-          sed -i -e 's|&download_url|"${{ env.downloadLink }}"|' ./src/updater.rs
+          # BackupIT's update-channel patch owns updater.rs.
+          if [ -z "${backupitUpdateManifest}" ]; then
+            sed -i -e 's|&download_url|"${{ env.downloadLink }}"|' ./src/updater.rs
+          fi
 
       - name: set server, key, and apiserver
         continue-on-error: true
