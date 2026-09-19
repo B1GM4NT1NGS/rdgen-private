@@ -147,8 +147,6 @@ def generate_custom_client(params, full_url):
     themeDorO = params.get('themeDorO', 'default')
     passApproveMode = params.get('passApproveMode', 'password-click')
     rustdeskApproveMode = rustdesk_approve_mode(passApproveMode)
-    askAndPass = passApproveMode == 'password-click' and not hidecm
-    verificationMethod = 'use-permanent-password' if hidecm or askAndPass else 'use-both-passwords'
     update_channel = backupit_update_channel(platform, filename, passApproveMode)
     backupitUpdateManifest = backupit_update_manifest_url(apiServer, update_channel)
     denyLan = params.get('denyLan', False)
@@ -251,7 +249,7 @@ def generate_custom_client(params, full_url):
         decodedCustom['default-settings']['enable-block-input'] = 'Y' if enableBlockingInput else 'N'
         decodedCustom['default-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
         decodedCustom['default-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
-        decodedCustom['default-settings']['verification-method'] = verificationMethod
+        decodedCustom['default-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
         decodedCustom['default-settings']['approve-mode'] = rustdeskApproveMode
         decodedCustom['default-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
         decodedCustom['default-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
@@ -272,7 +270,7 @@ def generate_custom_client(params, full_url):
         decodedCustom['override-settings']['enable-block-input'] = 'Y' if enableBlockingInput else 'N'
         decodedCustom['override-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
         decodedCustom['override-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
-        decodedCustom['override-settings']['verification-method'] = verificationMethod
+        decodedCustom['override-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
         decodedCustom['override-settings']['approve-mode'] = rustdeskApproveMode
         decodedCustom['override-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
         decodedCustom['override-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
@@ -341,7 +339,9 @@ def generate_custom_client(params, full_url):
         "downloadLink":downloadLink,
         "backupitUpdateManifest": backupitUpdateManifest,
         "backupitUpdateChannel": update_channel,
-        "backupitRequirePasswordAndClick": 'true' if askAndPass else 'false',
+        # RustDesk's native "both" mode is password OR user approval. Do not
+        # apply the older custom source patch which changed it into an AND gate.
+        "backupitRequirePasswordAndClick": 'false',
         "delayFix": 'true' if delayFix else 'false',
         "cycleMonitor": 'true' if cycleMonitor else 'false',
         "rdgen":'true',

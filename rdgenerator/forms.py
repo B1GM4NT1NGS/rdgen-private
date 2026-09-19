@@ -114,7 +114,7 @@ class GenerateForm(forms.Form):
     passApproveMode = forms.ChoiceField(choices=[
         ('password', 'Accept sessions via password'),
         ('click', 'Accept sessions via click'),
-        ('password-click', 'Require password, then remote approval'),
+        ('password-click', 'Allow password or remote approval'),
     ], initial='password-click')
     permanentPassword = forms.CharField(widget=forms.PasswordInput(), required=False)
     #runasadmin = forms.ChoiceField(choices=[('false','No'),('true','Yes')], initial='false')
@@ -149,7 +149,7 @@ class GenerateForm(forms.Form):
         ):
             self.add_error(
                 'permanentPassword',
-                'A permanent password is required when remote approval is also required.',
+                'A permanent password is required so unattended access remains available.',
             )
         return cleaned_data
 

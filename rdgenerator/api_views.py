@@ -96,7 +96,7 @@ def validate_generate_params(data):
         and not cleaned.get('permanentPassword')
     ):
         errors['permanentPassword'] = (
-            'A permanent password is required when remote approval is also required.'
+            'A permanent password is required so unattended access remains available.'
         )
 
     # File fields are not used in API mode (base64 fields are used instead)
