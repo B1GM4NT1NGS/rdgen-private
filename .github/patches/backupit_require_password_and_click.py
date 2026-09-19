@@ -22,6 +22,63 @@ def main():
     path = root / "src" / "server" / "connection.rs"
     text = path.read_text(encoding="utf-8")
 
+    connection_state = '''    tx_to_cm: mpsc::UnboundedSender<ipc::Data>,
+    authorized: bool,
+    require_2fa: Option<totp_rs::TOTP>,'''
+    connection_state_patched = '''    tx_to_cm: mpsc::UnboundedSender<ipc::Data>,
+    authorized: bool,
+    // Ask & Pass has two independent requirements. Neither one may start
+    // the desktop session until the other has completed.
+    backupit_password_prompted: bool,
+    backupit_password_verified: bool,
+    backupit_remote_approved: bool,
+    require_2fa: Option<totp_rs::TOTP>,'''
+    text = replace_once(text, connection_state, connection_state_patched, "Ask & Pass connection state")
+
+    connection_state_init = '''            tx_to_cm,
+            authorized: false,
+            keyboard: Self::permission(keys::OPTION_ENABLE_KEYBOARD, &control_permissions),'''
+    connection_state_init_patched = '''            tx_to_cm,
+            authorized: false,
+            backupit_password_prompted: false,
+            backupit_password_verified: false,
+            backupit_remote_approved: false,
+            keyboard: Self::permission(keys::OPTION_ENABLE_KEYBOARD, &control_permissions),'''
+    text = replace_once(
+        text,
+        connection_state_init,
+        connection_state_init_patched,
+        "Ask & Pass connection-state initialization",
+    )
+
+    authorize = '''                        ipc::Data::Authorize => {
+                            conn.set_conn_audit_primary_auth(ConnAuditPrimaryAuth::Click);
+                            conn.require_2fa.take();
+                            if !conn.send_logon_response_and_keep_alive().await {
+                                break;
+                            }
+                            if conn.port_forward_socket.is_some() {
+                                break;
+                            }
+                        }'''
+    authorize_gated = '''                        ipc::Data::Authorize => {
+                            conn.backupit_remote_approved = true;
+                            if !conn.backupit_password_verified {
+                                // The user may approve first, but the controller still has to
+                                // supply the permanent password before this session can start.
+                                continue;
+                            }
+                            conn.set_conn_audit_primary_auth(ConnAuditPrimaryAuth::Click);
+                            conn.require_2fa.take();
+                            if !conn.send_logon_response_and_keep_alive().await {
+                                break;
+                            }
+                            if conn.port_forward_socket.is_some() {
+                                break;
+                            }
+                        }'''
+    text = replace_once(text, authorize, authorize_gated, "Ask & Pass remote approval gate")
+
     gate = '''            if (password::approve_mode() == ApproveMode::Click && !allow_logon_screen_password)
                 || password::approve_mode() == ApproveMode::Both && !password::has_valid_password()
             {'''
@@ -29,7 +86,16 @@ def main():
             // controlled user's explicit approval for every new connection.
             let backupit_require_password_and_click = true;
 
-            if (password::approve_mode() == ApproveMode::Click && !allow_logon_screen_password)
+            if backupit_require_password_and_click && !self.backupit_password_prompted {
+                // Ignore any automatic/cached credential for the first request so the
+                // controller is always asked to type the password. Start the connection
+                // manager at the same time so the controlled user sees Allow/Dismiss.
+                self.backupit_password_prompted = true;
+                self.try_start_cm(lr.my_id, lr.my_name, false);
+                self.send_login_error(crate::client::LOGIN_MSG_PASSWORD_EMPTY)
+                    .await;
+                return true;
+            } else if (password::approve_mode() == ApproveMode::Click && !allow_logon_screen_password)
                 || (password::approve_mode() == ApproveMode::Both
                     && !password::has_valid_password()
                     && !backupit_require_password_and_click)
@@ -62,9 +128,15 @@ def main():
                     } else {'''
     authorization_wait = '''                    self.update_failure_with_scope(failure, true, 0, FailureScope::Default);
                     if err_msg.is_empty() && backupit_require_password_and_click {
-                        self.try_start_cm(lr.my_id, lr.my_name, false);
-                        self.send_login_error(crate::client::LOGIN_MSG_NO_PASSWORD_ACCESS)
-                            .await;
+                        self.backupit_password_verified = true;
+                        if self.backupit_remote_approved {
+                            if !self.send_logon_response_and_keep_alive().await {
+                                return false;
+                            }
+                        } else {
+                            self.send_login_error(crate::client::LOGIN_MSG_NO_PASSWORD_ACCESS)
+                                .await;
+                        }
                     } else if err_msg.is_empty() {
                         #[cfg(target_os = "linux")]
                         self.linux_headless_handle.wait_desktop_cm_ready().await;
