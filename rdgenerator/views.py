@@ -79,6 +79,17 @@ def backupit_update_channel(platform, filename="", pass_approve_mode=""):
     return platform
 
 
+def rustdesk_approve_mode(pass_approve_mode=""):
+    """Translate BackupIT's form label into RustDesk's supported setting."""
+    mode = str(pass_approve_mode or "").strip().lower()
+    return {
+        "password": "password",
+        "click": "click",
+        "both": "both",
+        "password-click": "both",
+    }.get(mode, "both")
+
+
 
 
 def generate_custom_client(params, full_url):
@@ -135,6 +146,7 @@ def generate_custom_client(params, full_url):
     theme = params.get('theme', 'system')
     themeDorO = params.get('themeDorO', 'default')
     passApproveMode = params.get('passApproveMode', 'password-click')
+    rustdeskApproveMode = rustdesk_approve_mode(passApproveMode)
     update_channel = backupit_update_channel(platform, filename, passApproveMode)
     backupitUpdateManifest = backupit_update_manifest_url(apiServer, update_channel)
     denyLan = params.get('denyLan', False)
@@ -238,7 +250,7 @@ def generate_custom_client(params, full_url):
         decodedCustom['default-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
         decodedCustom['default-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
         decodedCustom['default-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
-        decodedCustom['default-settings']['approve-mode'] = passApproveMode
+        decodedCustom['default-settings']['approve-mode'] = rustdeskApproveMode
         decodedCustom['default-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
         decodedCustom['default-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
         decodedCustom['default-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'
@@ -259,7 +271,7 @@ def generate_custom_client(params, full_url):
         decodedCustom['override-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
         decodedCustom['override-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
         decodedCustom['override-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
-        decodedCustom['override-settings']['approve-mode'] = passApproveMode
+        decodedCustom['override-settings']['approve-mode'] = rustdeskApproveMode
         decodedCustom['override-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
         decodedCustom['override-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
         decodedCustom['override-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'

@@ -38,17 +38,14 @@ def main():
 
     recent_session = '''            } else if self.is_recent_session(false) {'''
     recent_session_gated = '''            } else if self.is_recent_session(false)
-                && !(backupit_require_password_and_click
-                    && password::approve_mode() == ApproveMode::Both)
+                && !backupit_require_password_and_click
             {'''
     text = replace_once(text, recent_session, recent_session_gated, "Ask & Pass session reuse")
 
     empty_password = '''            } else if lr.password.is_empty() {
                 if err_msg.is_empty() {'''
     empty_password_gated = '''            } else if lr.password.is_empty() {
-                if backupit_require_password_and_click
-                    && password::approve_mode() == ApproveMode::Both
-                {
+                if backupit_require_password_and_click {
                     self.send_login_error(crate::client::LOGIN_MSG_PASSWORD_EMPTY)
                         .await;
                 } else if err_msg.is_empty() {'''
@@ -64,10 +61,7 @@ def main():
                         self.try_start_cm(lr.my_id, lr.my_name, self.authorized);
                     } else {'''
     authorization_wait = '''                    self.update_failure_with_scope(failure, true, 0, FailureScope::Default);
-                    if err_msg.is_empty()
-                        && backupit_require_password_and_click
-                        && password::approve_mode() == ApproveMode::Both
-                    {
+                    if err_msg.is_empty() && backupit_require_password_and_click {
                         self.try_start_cm(lr.my_id, lr.my_name, false);
                         self.send_login_error(crate::client::LOGIN_MSG_NO_PASSWORD_ACCESS)
                             .await;
@@ -81,7 +75,18 @@ def main():
                     } else {'''
     text = replace_once(text, authorized, authorization_wait, "Ask & Pass approval wait")
 
+    cm_path = root / "src" / "ui" / "cm.tis"
+    cm_text = cm_path.read_text(encoding="utf-8")
+    cm_text = replace_once(
+        cm_text,
+        "        var show_accept_btn = handler.get_option('approve-mode') != 'password';",
+        "        // Ask & Pass must still show Allow if an older setting is preserved during an update.\n"
+        "        var show_accept_btn = true;",
+        "Ask & Pass connection-manager controls",
+    )
+
     path.write_text(text, encoding="utf-8")
+    cm_path.write_text(cm_text, encoding="utf-8")
     print("BackupIT Ask & Pass patch enabled")
     return 0
 
