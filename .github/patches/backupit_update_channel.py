@@ -220,22 +220,37 @@ def patch_update_progress():
     if "if (!bind.isCustomClient() &&" in text:
         raise RuntimeError("BackupIT update card is still hidden for custom clients")
 
-    old_submit = '''      onSubmit: () {
+    old_update_message = '''  void updateMsgBox() {
+    msgBox(
+      gFFI.sessionId,
+      'custom-nocancel',
+      '{$appName} Update',
+      '{$appName}-to-update-tip',
+      '',
+      gFFI.dialogManager,
+      onSubmit: () {
         debugPrint('Downloaded, update to new version now');
         bind.mainSetCommon(key: 'update-me', value: widget.downloadUrl);
       },
+      submitTimeout: 5,
+    );
+  }
 '''
-    new_submit = '''      onSubmit: () {
-        debugPrint('Downloaded, update to new version now');
-        if (widget.releasePageUrl.contains('/updates/download/')) {
-          bind.mainSetCommon(
-              key: 'backupit-update-grabbed', value: widget.releasePageUrl);
-        }
-        bind.mainSetCommon(key: 'update-me', value: widget.downloadUrl);
-      },
+    new_update_message = '''  void updateMsgBox() {
+    // The person has already chosen Update. Do not leave a downloaded installer
+    // behind for them to find: hand it to the native updater straight away.
+    debugPrint('Downloaded, starting BackupIT update now');
+    if (widget.releasePageUrl.contains('/updates/download/')) {
+      bind.mainSetCommon(
+          key: 'backupit-update-grabbed', value: widget.releasePageUrl);
+    }
+    bind.mainSetCommon(key: 'update-me', value: widget.downloadUrl);
+  }
 '''
-    if old_submit in text:
-        text = text.replace(old_submit, new_submit, 1)
+    if old_update_message in text:
+        text = text.replace(old_update_message, new_update_message, 1)
+    elif "Downloaded, starting BackupIT update now" not in text:
+        raise RuntimeError("Unable to make BackupIT updates install after download; update dialog changed upstream")
     write(path, text)
 
 
