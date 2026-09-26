@@ -121,18 +121,18 @@ def generate_custom_client(params, full_url):
     urlLink = params.get('urlLink', '')
     downloadLink = params.get('downloadLink', '')
     if not server:
-        server = 'rs-ny.rustdesk.com' #default rustdesk server
+        server = env_default('RDGEN_DEFAULT_SERVER', 'server.v22.online')
     if not serverPort:
-        serverPort = '21116' #default rustdesk rendezvous port
+        serverPort = env_default('RDGEN_DEFAULT_SERVER_PORT', '21116')
     if not key:
-        key = 'OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=' #default rustdesk key
+        key = env_default('RDGEN_DEFAULT_KEY', '')
     if not apiServer:
-        apiServer = server+":21114"
-            apiServer = api_server_url(apiServer)
+        apiServer = env_default('RDGEN_DEFAULT_API_SERVER', server + ':21114')
+    apiServer = api_server_url(apiServer)
     if not urlLink:
-        urlLink = "https://rustdesk.com"
+        urlLink = env_default('RDGEN_DEFAULT_URL_LINK', 'https://www.backupit.co.uk')
     if not downloadLink:
-        downloadLink = "https://rustdesk.com/download"
+        downloadLink = env_default('RDGEN_DEFAULT_DOWNLOAD_LINK', 'https://www.backupit.co.uk')
     direction = params.get('direction', 'both')
     installation = params.get('installation', 'installationY')
     settings = params.get('settings', 'settingsY')
