@@ -79,6 +79,8 @@ def backupit_update_channel(platform, filename="", pass_approve_mode=""):
     return platform
 
 
+
+
 def rustdesk_approve_mode(pass_approve_mode=""):
     """Translate BackupIT's form label into RustDesk's supported setting."""
     mode = str(pass_approve_mode or "").strip().lower()
@@ -88,8 +90,6 @@ def rustdesk_approve_mode(pass_approve_mode=""):
         "both": "both",
         "password-click": "both",
     }.get(mode, "both")
-
-
 
 
 def generate_custom_client(params, full_url):
@@ -115,21 +115,24 @@ def generate_custom_client(params, full_url):
     hidecm = params.get('hidecm', False)
     removeNewVersionNotif = params.get('removeNewVersionNotif', False)
     server = params.get('serverIP', '')
+    serverPort = params.get('serverPort', '')
     key = params.get('key', '')
     apiServer = params.get('apiServer', '')
     urlLink = params.get('urlLink', '')
     downloadLink = params.get('downloadLink', '')
     if not server:
-        server = env_default('RDGEN_DEFAULT_SERVER', 'server.v22.online')
+        server = 'rs-ny.rustdesk.com' #default rustdesk server
+    if not serverPort:
+        serverPort = '21116' #default rustdesk rendezvous port
     if not key:
-        key = env_default('RDGEN_DEFAULT_KEY', '')
+        key = 'OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=' #default rustdesk key
     if not apiServer:
-        apiServer = env_default('RDGEN_DEFAULT_API_SERVER', server + ':21114')
-    apiServer = api_server_url(apiServer)
+        apiServer = server+":21114"
+            apiServer = api_server_url(apiServer)
     if not urlLink:
-        urlLink = env_default('RDGEN_DEFAULT_URL_LINK', 'https://www.backupit.co.uk')
+        urlLink = "https://rustdesk.com"
     if not downloadLink:
-        downloadLink = env_default('RDGEN_DEFAULT_DOWNLOAD_LINK', 'https://www.backupit.co.uk')
+        downloadLink = "https://rustdesk.com/download"
     direction = params.get('direction', 'both')
     installation = params.get('installation', 'installationY')
     settings = params.get('settings', 'settingsY')
@@ -215,11 +218,6 @@ def generate_custom_client(params, full_url):
         decodedCustom['app-name'] = appname
     decodedCustom['override-settings'] = {}
     decodedCustom['default-settings'] = {}
-    decodedCustom['override-settings']['custom-rendezvous-server'] = server
-    decodedCustom['override-settings']['relay-server'] = server
-    decodedCustom['override-settings']['api-server'] = apiServer
-    if key:
-        decodedCustom['override-settings']['key'] = key
     if permPass != "":
         decodedCustom['password'] = permPass
     if theme != "system":
@@ -320,6 +318,7 @@ def generate_custom_client(params, full_url):
 
     inputs_raw = {
         "server":server,
+        "serverPort":serverPort,
         "key":key,
         "apiServer":apiServer,
         "custom":encodedCustom,
@@ -339,9 +338,6 @@ def generate_custom_client(params, full_url):
         "downloadLink":downloadLink,
         "backupitUpdateManifest": backupitUpdateManifest,
         "backupitUpdateChannel": update_channel,
-        # RustDesk's native "both" mode is password OR user approval. Do not
-        # apply the older custom source patch which changed it into an AND gate.
-        "backupitRequirePasswordAndClick": 'false',
         "delayFix": 'true' if delayFix else 'false',
         "cycleMonitor": 'true' if cycleMonitor else 'false',
         "rdgen":'true',

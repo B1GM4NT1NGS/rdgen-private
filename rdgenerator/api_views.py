@@ -1,10 +1,9 @@
 import json
+import re
 from django.http import JsonResponse
 from django.conf import settings as _settings
 from .views import generate_custom_client, _get_run_status, public_gen_url
 from .forms import GenerateForm
-
-
 # Field validation constraints (mirrored from GenerateForm)
 PLATFORM_CHOICES = ['windows', 'windows-x86', 'windows-admin', 'linux', 'android', 'macos']
 VERSION_CHOICES = ['master', '1.4.9', '1.4.8', '1.4.7', '1.4.6', '1.4.5', '1.4.4', '1.4.3', '1.4.2', '1.4.1', '1.4.0']
@@ -28,7 +27,7 @@ BOOL_FIELDS = [
 
 # Optional string fields (no validation needed, just accept as-is)
 OPTIONAL_STR_FIELDS = [
-    'sh_secret_field', 'serverIP', 'key', 'apiServer', 'urlLink', 'downloadLink',
+    'sh_secret_field', 'serverIP', 'serverPort', 'key', 'apiServer', 'urlLink', 'downloadLink',
     'appname', 'compname', 'androidappid', 'permanentPassword',
     'defaultManual', 'overrideManual',
     'iconbase64', 'logobase64', 'privacybase64',
@@ -90,14 +89,15 @@ def validate_generate_params(data):
     for field in OPTIONAL_STR_FIELDS:
         cleaned[field] = data.get(field, '')
 
-    if (
-        cleaned.get('passApproveMode') == 'password-click'
-        and not cleaned.get('hidecm')
-        and not cleaned.get('permanentPassword')
-    ):
-        errors['permanentPassword'] = (
-            'A permanent password is required so unattended access remains available.'
-        )
+    # Free-text names flow into single/double-quoted bash sed scripts
+    # (same rule as GenerateForm.clean_appname/clean_compname).
+    for field in ('appname', 'compname'):
+        value = cleaned.get(field, '')
+        if isinstance(value, str) and re.search(r'[&\\|\'"$`\r\n]', value):
+            errors[field] = (
+                'Contains characters unsupported in build scripts '
+                '(& \\ | \' " $ `, newlines).'
+            )
 
     # File fields are not used in API mode (base64 fields are used instead)
     cleaned['iconfile'] = None

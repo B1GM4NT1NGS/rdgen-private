@@ -1,3 +1,5 @@
+import re
+
 from django import forms
 from PIL import Image
 from django.conf import settings
@@ -62,6 +64,11 @@ def env_bool(name, default=False):
     return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+# App/company names are interpolated into single/double-quoted bash sed
+# scripts in every generator workflow: & \ | corrupt the substitution
+# silently, ' " $ ` break shell quoting, CR/LF break sed addressing.
+UNSAFE_NAME_CHARS = re.compile(r'[&\\|\'"$`\r\n]')
+
 class GenerateForm(forms.Form):
     sh_secret_field = forms.CharField(required=False)
     #Platform
@@ -90,6 +97,7 @@ class GenerateForm(forms.Form):
 
     #Custom Server
     serverIP = forms.CharField(label="Host", required=False)
+    serverPort = forms.CharField(label="Port", required=False)
     apiServer = forms.CharField(label="API Server", required=False)
     key = forms.CharField(label="Key", required=False)
     urlLink = forms.CharField(label="Custom URL for links", required=False)
@@ -203,3 +211,18 @@ class GenerateForm(forms.Form):
                 raise forms.ValidationError("Invalid icon file.")
             except Exception as e: # Catch any other image processing errors
                 raise forms.ValidationError(f"Error processing icon: {e}")
+
+    def _reject_unsafe_name_chars(self, field):
+        value = self.cleaned_data.get(field, '')
+        if value and UNSAFE_NAME_CHARS.search(value):
+            raise forms.ValidationError(
+                "Contains characters unsupported in build scripts "
+                "(& \\ | ' \" $ `, newlines)."
+            )
+        return value
+
+    def clean_appname(self):
+        return self._reject_unsafe_name_chars('appname')
+
+    def clean_compname(self):
+        return self._reject_unsafe_name_chars('compname')
