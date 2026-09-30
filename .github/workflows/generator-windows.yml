@@ -670,7 +670,7 @@ jobs:
       - name: sign dlls
         shell: pwsh
         run: |
-          .\.github\scripts\sign_windows_archive.ps1 -InputZip ./rustdesk/unsigned_files.zip -OutputZip ./rustdesk/signed_files.zip
+          & "$env:GITHUB_WORKSPACE\.github\scripts\sign_windows_archive.ps1" -InputZip ./rustdesk/unsigned_files.zip -OutputZip ./rustdesk/signed_files.zip
 
       - name: unzip dlls
         shell: pwsh
@@ -723,7 +723,7 @@ jobs:
       - name: sign exe and msi
         shell: pwsh
         run: |
-          .\.github\scripts\sign_windows_archive.ps1 -InputZip ./SignOutput/unsigned_files.zip -OutputZip ./SignOutput/signed_files.zip
+          & "$env:GITHUB_WORKSPACE\.github\scripts\sign_windows_archive.ps1" -InputZip ./SignOutput/unsigned_files.zip -OutputZip ./SignOutput/signed_files.zip
 
       - name: unzip exe and msi
         shell: pwsh
