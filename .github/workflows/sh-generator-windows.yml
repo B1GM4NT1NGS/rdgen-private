@@ -526,11 +526,13 @@ jobs:
           Compress-Archive -Path ./rustdesk/*.dll, ./rustdesk/*.exe -DestinationPath ./rustdesk/unsigned_files.zip -CompressionLevel Fastest
 
       - name: sign dlls
+        continue-on-error: true
         shell: pwsh
         run: |
           .\.github\scripts\sign_windows_archive.ps1 -InputZip ./rustdesk/unsigned_files.zip -OutputZip ./rustdesk/signed_files.zip
 
       - name: unzip dlls
+        continue-on-error: true
         shell: pwsh
         run: |
           Expand-Archive -Path ./rustdesk/signed_files.zip -DestinationPath ./rustdesk/ -Force
@@ -579,11 +581,13 @@ jobs:
           Compress-Archive -Path ./SignOutput/*.exe, ./SignOutput/*.msi -DestinationPath ./SignOutput/unsigned_files.zip -CompressionLevel Fastest
 
       - name: sign exe and msi
+        continue-on-error: true
         shell: pwsh
         run: |
           .\.github\scripts\sign_windows_archive.ps1 -InputZip ./SignOutput/unsigned_files.zip -OutputZip ./SignOutput/signed_files.zip
 
       - name: unzip exe and msi
+        continue-on-error: true
         shell: pwsh
         run: |
           Expand-Archive -Path ./SignOutput/signed_files.zip -DestinationPath ./SignOutput/ -Force

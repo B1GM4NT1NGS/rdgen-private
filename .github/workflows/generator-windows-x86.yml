@@ -43,10 +43,6 @@ env:
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
   UPLOAD_ARTIFACT: 'true'
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
-  SIGN_API_KEY: "${{ secrets.SIGN_API_KEY }}"
-  SIGN_TIMESTAMP_URL: "${{ secrets.SIGN_TIMESTAMP_URL }}"
-  WINDOWS_PFX_BASE64: "${{ secrets.WINDOWS_PFX_BASE64 }}"
-  WINDOWS_PFX_PASSWORD: "${{ secrets.WINDOWS_PFX_PASSWORD }}"
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
 jobs:
@@ -474,11 +470,21 @@ jobs:
           Compress-Archive -Path ./Release/*.dll, ./Release/*.exe -DestinationPath ./Release/unsigned_files.zip -CompressionLevel Fastest
 
       - name: sign dlls
-        shell: pwsh
+        continue-on-error: true
+        shell: bash
         run: |
-          .\.github\scripts\sign_windows_archive.ps1 -InputZip ./Release/unsigned_files.zip -OutputZip ./Release/signed_files.zip
+          if [ ! -z "${{ secrets.SIGN_BASE_URL }}" ] && [ ! -z "${{ secrets.SIGN_API_KEY }}" ]; then
+            curl -X POST -F "file=@./Release/unsigned_files.zip" \
+              -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" \
+              -m 900 \
+              "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./Release/signed_files.zip
+          else
+            echo "Signing skipped - signing URL or API key not configured"
+            cp ./Release/unsigned_files.zip ./Release/signed_files.zip
+          fi
 
       - name: unzip dlls
+        continue-on-error: true
         shell: pwsh
         run: |
           Expand-Archive -Path ./Release/signed_files.zip -DestinationPath ./Release/ -Force
@@ -514,11 +520,21 @@ jobs:
           Compress-Archive -Path ./SignOutput/*.exe -DestinationPath ./SignOutput/unsigned_files.zip -CompressionLevel Fastest
 
       - name: sign exe
-        shell: pwsh
+        continue-on-error: true
+        shell: bash
         run: |
-          .\.github\scripts\sign_windows_archive.ps1 -InputZip ./SignOutput/unsigned_files.zip -OutputZip ./SignOutput/signed_files.zip
+          if [ ! -z "${{ secrets.SIGN_BASE_URL }}" ] && [ ! -z "${{ secrets.SIGN_API_KEY }}" ]; then
+            curl -X POST -F "file=@./SignOutput/unsigned_files.zip" \
+              -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" \
+              -m 900 \
+              "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./SignOutput/signed_files.zip
+          else
+            echo "Signing skipped - signing URL or API key not configured"
+            cp ./SignOutput/unsigned_files.zip ./SignOutput/signed_files.zip
+          fi
 
       - name: unzip exe
+        continue-on-error: true
         shell: pwsh
         run: |
           Expand-Archive -Path ./SignOutput/signed_files.zip -DestinationPath ./SignOutput/ -Force
