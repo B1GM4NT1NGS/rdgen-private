@@ -476,7 +476,7 @@ jobs:
       - name: sign dlls
         shell: pwsh
         run: |
-          & "$env:GITHUB_WORKSPACE\.github\scripts\sign_windows_archive.ps1" -InputZip ./Release/unsigned_files.zip -OutputZip ./Release/signed_files.zip
+          .\.github\scripts\sign_windows_archive.ps1 -InputZip ./Release/unsigned_files.zip -OutputZip ./Release/signed_files.zip
 
       - name: unzip dlls
         shell: pwsh
@@ -516,7 +516,7 @@ jobs:
       - name: sign exe
         shell: pwsh
         run: |
-          & "$env:GITHUB_WORKSPACE\.github\scripts\sign_windows_archive.ps1" -InputZip ./SignOutput/unsigned_files.zip -OutputZip ./SignOutput/signed_files.zip
+          .\.github\scripts\sign_windows_archive.ps1 -InputZip ./SignOutput/unsigned_files.zip -OutputZip ./SignOutput/signed_files.zip
 
       - name: unzip exe
         shell: pwsh
