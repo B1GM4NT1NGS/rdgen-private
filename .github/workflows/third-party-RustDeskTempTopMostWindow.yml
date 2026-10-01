@@ -7,6 +7,10 @@ on:
             description: 'RustDesk version, used to select a compatible privacy DLL'
             type: string
             default: ''
+        zip_url_json:
+            description: 'Encrypted build config JSON'
+            required: true
+            type: string
         upload-artifact:
           type: boolean
           default: true
@@ -48,24 +52,16 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v5
 
-      - uses: actions/download-artifact@v5
+      - name: Fetch encrypted build config
+        uses: ./.github/actions/fetch-encrypted-secrets
         with:
-          name: encrypted-secrets-zip
+          zip_url_json: ${{ inputs.zip_url_json }}
+          zip_password: ${{ secrets.ZIP_PASSWORD }}
 
       - name: Load Secrets
         uses: ./.github/actions/decrypt-secrets
         with:
           zip_password: ${{ secrets.ZIP_PASSWORD }}
-
-      - name: Finalize and Cleanup zip/json
-        if: always() # Run even if previous steps fail
-        continue-on-error: true
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: "${{ secrets.GENURL }}/cleanzip"
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Download the source code
         run: |
