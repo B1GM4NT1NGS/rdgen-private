@@ -57,6 +57,7 @@ jobs:
   build-RustDeskTempTopMostWindow:
     uses: ./.github/workflows/third-party-RustDeskTempTopMostWindow.yml
     with:
+      rustdesk-version: ${{ inputs.version }}
       upload-artifact: true
       target: windows-2022
       configuration: Release
