@@ -1013,7 +1013,6 @@ jobs:
         shell: bash
 
       - name: Build libdrmtap
-        if: env.DRM_SUPPORTED == 'true'
         run: |
           sudo apt-get install -y meson ninja-build pkg-config \
             libdrm-dev libegl1-mesa-dev libgles2-mesa-dev
@@ -1247,6 +1246,7 @@ jobs:
                gcc \
                git \
                g++ \
+               imagemagick \
                libayatana-appindicator3-dev \
                libasound2-dev \
                libclang-10-dev \
@@ -1385,7 +1385,7 @@ jobs:
             done
 
       - name: send file to rdgen server
-        if: ${{ env.rdgen == 'true' && env.DRM_SUPPORTED == 'true' }}
+        if: ${{ env.rdgen == 'true' }}
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 10
@@ -1396,7 +1396,7 @@ jobs:
             curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-unattended-wayland-x86_64.deb" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
 
       - name: send file to api server
-        if: ${{ env.rdgen == 'false' && env.DRM_SUPPORTED == 'true' }}
+        if: ${{ env.rdgen == 'false' }}
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 10
