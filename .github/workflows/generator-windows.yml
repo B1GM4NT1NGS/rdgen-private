@@ -1,5 +1,5 @@
 name: Custom Windows Client Generator
-run-name: Custom Windows Client Generator (${{ inputs.version }})
+run-name: Custom Windows Client Generator
 on: 
   workflow_dispatch:
     inputs:
@@ -13,10 +13,12 @@ on:
         required: true
         default: ''
         type: string
+      app_version:
+        description: 'custom app version string (overrides build version)'
+        required: false
+        default: ''
+        type: string
 
-permissions:
-  contents: read
-  actions: write
 
 env:
   SCITER_RUST_VERSION: "1.75" # https://github.com/rustdesk/rustdesk/discussions/7503, also 1.78 has ABI change which causes our sciter version not working, https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
@@ -30,7 +32,7 @@ env:
   # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
   TAG_NAME: "${{ inputs.upload-tag }}"
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  VCPKG_BINARY_SOURCES: "clear"
   # vcpkg version: 2024.07.12
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
   ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836"
@@ -41,20 +43,22 @@ env:
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
   UPLOAD_ARTIFACT: 'true'
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
-  SIGN_API_KEY: "${{ secrets.SIGN_API_KEY }}"
-  SIGN_TIMESTAMP_URL: "${{ secrets.SIGN_TIMESTAMP_URL }}"
-  WINDOWS_PFX_BASE64: "${{ secrets.WINDOWS_PFX_BASE64 }}"
-  WINDOWS_PFX_PASSWORD: "${{ secrets.WINDOWS_PFX_PASSWORD }}"
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
 
 jobs:
+  setup:
+    uses: ./.github/workflows/fetch-encrypted-secrets.yml
+    with:
+      zip_url_json: ${{ inputs.zip_url }}
+
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
     with:
       version: ${{ inputs.version }}
 
   build-RustDeskTempTopMostWindow:
+    needs: setup
     uses: ./.github/workflows/third-party-RustDeskTempTopMostWindow.yml
     with:
       rustdesk-version: ${{ inputs.version }}
@@ -63,14 +67,13 @@ jobs:
       configuration: Release
       platform: x64
       target_version: Windows10
-      zip_url_json: ${{ inputs.zip_url }}
     secrets: inherit
     strategy:
       fail-fast: false
 
   build-for-windows-flutter:
     name: Build Windows
-    needs: [build-RustDeskTempTopMostWindow, generate-bridge]
+    needs: [build-RustDeskTempTopMostWindow, generate-bridge, setup]
     runs-on: ${{ matrix.job.os }}
     strategy:
       fail-fast: false
@@ -91,16 +94,24 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         
-      - name: Fetch encrypted build config
-        uses: ./.github/actions/fetch-encrypted-secrets
+      - uses: actions/download-artifact@v4
         with:
-          zip_url_json: ${{ inputs.zip_url }}
-          zip_password: ${{ secrets.ZIP_PASSWORD }}
+          name: encrypted-secrets-zip
 
       - name: Load Secrets
         uses: ./.github/actions/decrypt-secrets
         with:
           zip_password: ${{ secrets.ZIP_PASSWORD }}
+
+      - name: Finalize and Cleanup zip/json
+        if: always() # Run even if previous steps fail
+        continue-on-error: true
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: "${{ secrets.GENURL }}/cleanzip"
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
@@ -134,15 +145,25 @@ jobs:
           repository: rustdesk/rustdesk
           submodules: recursive
 
-      - name: Verify selected RustDesk version
-        if: ${{ env.VERSION != 'master' }}
+      - name: Set custom app version
+        continue-on-error: true
+        if: ${{ inputs.app_version != '' }}
         shell: bash
         run: |
-          actual="$(git describe --tags --exact-match 2>/dev/null || true)"
-          if [[ "$actual" != "$VERSION" ]]; then
-            echo "Selected RustDesk version $VERSION but checked out $actual"
-            exit 1
-          fi
+          sed -i -e 's|^version = ".*"|version = "${{ inputs.app_version }}"|' ./Cargo.toml
+          sed -i '/name = "rustdesk"/ {n; s/version = ".*"/version = "${{ inputs.app_version }}"/}' ./Cargo.lock
+          grep '^version = ' ./Cargo.toml
+
+      - name: Apply allow_custom_update patch
+        continue-on-error: true
+        if: ${{ env.update_public_key != '' }}
+        shell: bash
+        run: |
+          curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/allow_custom_update.py?ref=${{ github.ref_name }}" -o allow_custom_update.py
+          python3 allow_custom_update.py \
+            --rustdesk-root . \
+            --update-url "${{ env.downloadLink}}/api/version/latest" \
+            --ed25519-public-key "${{ env.update_public_key }}"
 
       - name: Restore bridge files
         uses: actions/download-artifact@master
@@ -181,7 +202,7 @@ jobs:
           # ./flutter/windows/runner/Runner.rc
           sed -i -e 's|"RustDesk Remote Desktop"|"${{ env.appname }}"|' ./flutter/windows/runner/Runner.rc
           sed -i -e 's|VALUE "InternalName", "rustdesk" "\0"|VALUE "InternalName", "${{ env.appname }}" "\0"|' ./flutter/windows/runner/Runner.rc
-          sed -i -e 's|"rustdesk.exe"|"${{ env.filename }}"|' ./flutter/windows/runner/Runner.rc
+          sed -i -e 's|"rustdesk.exe"|"${{ env.appname }}"|' ./flutter/windows/runner/Runner.rc
           sed -i -e 's|"RustDesk"|"${{ env.appname }}"|' ./flutter/windows/runner/Runner.rc
           # ./src/lang/en.rs
           # change powered by rustdek to powered by compname
@@ -190,31 +211,6 @@ jobs:
           fi
           find ./src/lang -name "*.rs" -exec sed -i -e 's|RustDesk|${{ env.appname }}|' {} \;
           sed -i -e 's|RustDesk|${{ env.appname }}|' ./res/msi/Package/License.rtf
-
-      - name: fix registry if appname has a space
-        if: contains(env.appname, ' ')
-        continue-on-error: true
-        shell: bash
-        run: |
-          #./src/platform/windows.rs
-          sed -i -e 's|reg add {}|reg add \\\"{}\\\"|' ./src/platform/windows.rs
-          sed -i -e 's|reg add HKEY_CLASSES_ROOT\\\\.{ext} /f|reg add \\\"HKEY_CLASSES_ROOT\\\\.{ext}\\\" /f|' ./src/platform/windows.rs
-          sed -i -e 's|reg add HKEY_CLASSES_ROOT\\\\.{ext}\\\\DefaultIcon /f|reg add \\\"HKEY_CLASSES_ROOT\\\\.{ext}\\\\DefaultIcon\\\" /f|' ./src/platform/windows.rs
-          sed -i -e 's|reg add HKEY_CLASSES_ROOT\\\\.{ext}\\\\shell /f|reg add \\\"HKEY_CLASSES_ROOT\\\\.{ext}\\\\shell\\\" /f|' ./src/platform/windows.rs
-          sed -i -e 's|reg add HKEY_CLASSES_ROOT\\\\.{ext}\\\\shell\\\\open /f|reg add \\\"HKEY_CLASSES_ROOT\\\\.{ext}\\\\shell\\\\open\\\" /f|' ./src/platform/windows.rs
-          sed -i -e 's|reg add HKEY_CLASSES_ROOT\\\\.{ext}\\\\shell\\\\open\\\\command|reg add \\\"HKEY_CLASSES_ROOT\\\\.{ext}\\\\shell\\\\open\\\\command\\\"|' ./src/platform/windows.rs
-          sed -i -e 's|reg add HKEY_CLASSES_ROOT\\\\{ext} /f|reg add \\\"HKEY_CLASSES_ROOT\\\\{ext}\\\" /f|' ./src/platform/windows.rs
-          sed -i -e 's|reg add HKEY_CLASSES_ROOT\\\\{ext}\\\\shell /f|reg add \\\"HKEY_CLASSES_ROOT\\\\{ext}\\\\shell\\\" /f|' ./src/platform/windows.rs
-          sed -i -e 's|reg add HKEY_CLASSES_ROOT\\\\{ext}\\\\shell\\\\open /f|reg add \\\"HKEY_CLASSES_ROOT\\\\{ext}\\\\shell\\\\open\\\" /f|' ./src/platform/windows.rs
-          sed -i -e 's|reg add HKEY_CLASSES_ROOT\\\\{ext}\\\\shell\\\\open\\\\command /f|reg add \\\"HKEY_CLASSES_ROOT\\\\{ext}\\\\shell\\\\open\\\\command\\\" /f|' ./src/platform/windows.rs
-          sed -i -e 's|{subkey}|\\\"{subkey}\\\"|' ./src/platform/windows.rs
-          sed -i -e 's|reg delete HKEY_CLASSES_ROOT\\\\.{ext} /f|reg delete \\\"HKEY_CLASSES_ROOT\\\\.{ext}\\\" /f|' ./src/platform/windows.rs
-          sed -i -e 's|reg delete HKEY_CLASSES_ROOT\\\\{ext} /f|reg delete \\\"HKEY_CLASSES_ROOT\\\\{ext}\\\" /f|' ./src/platform/windows.rs
-          sed -i -e 's|taskkill /F /IM {app_name}.exe|taskkill /F /IM \\\"{app_name}.exe\\\"|g' ./src/platform/windows.rs
-          sed -i -e 's|sc stop {app_name}|sc stop \\\"{app_name}\\\"|g' ./src/platform/windows.rs
-          sed -i -e 's|sc delete {app_name}|sc delete \\\"{app_name}\\\"|g' ./src/platform/windows.rs
-          sed -i -e 's|sc create {app_name} binpath=|sc create \\\"{app_name}\\\" binpath=|g' ./src/platform/windows.rs
-          sed -i -e 's|sc start {app_name}|sc start \\\"{app_name}\\\"|g' ./src/platform/windows.rs
           
       - name: change company name
         if: env.compname != 'Purslane Ltd'
@@ -260,11 +256,8 @@ jobs:
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./flutter/lib/desktop/pages/desktop_home_page.dart
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./flutter/lib/mobile/pages/connection_page.dart
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./src/ui/index.tis
-          # BackupIT's update-channel patch owns updater.rs and update_progress.dart.
-          if [ -z "${backupitUpdateManifest}" ]; then
-            sed -i -e 's|&download_url|"${{ env.downloadLink }}"|' ./src/updater.rs
-            sed -i -e 's|$downloadUrl/$downloadFile|${{ env.downloadLink }}|' ./flutter/lib/desktop/widgets/update_progress.dart
-          fi
+          sed -i -e 's|&download_url|"${{ env.downloadLink }}"|' ./src/updater.rs
+          sed -i -e 's|$downloadUrl/$downloadFile|${{ env.downloadLink }}|' ./flutter/lib/desktop/widgets/update_progress.dart
 
       - name: set server, serverPort, key, and apiserver
         continue-on-error: true
@@ -332,17 +325,6 @@ jobs:
             git apply removeSetupServerTip.diff
             Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_terminal_cm_hidden.py?ref=${{ github.ref_name }}" -OutFile backupit_terminal_cm_hidden.py
             python backupit_terminal_cm_hidden.py
-            Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_update_channel.py?ref=${{ github.ref_name }}" -OutFile backupit_update_channel.py
-            python backupit_update_channel.py
-            Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_hwid.py?ref=${{ github.ref_name }}" -OutFile backupit_hwid.py
-            python backupit_hwid.py
-
-      - name: Enforce BackupIT Ask and Pass approval
-        if: env.backupitRequirePasswordAndClick == 'true'
-        shell: pwsh
-        run: |
-          Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_require_password_and_click.py?ref=${{ github.ref_name }}" -OutFile backupit_require_password_and_click.py
-          python backupit_require_password_and_click.py
 
       - name: Patch remote printer port to spool file
         shell: python
@@ -393,6 +375,15 @@ jobs:
                   else:
                       print("Warning: RD_PRINTER_PORT not matched in RemotePrinter.cpp")
 
+      - name: Apply BackupIT update channel
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_update_channel.py?ref=${{ github.ref_name }}" -OutFile backupit_update_channel.py
+          python backupit_update_channel.py
+          Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_hwid.py?ref=${{ github.ref_name }}" -OutFile backupit_hwid.py
+          python backupit_hwid.py
+
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
@@ -433,7 +424,15 @@ jobs:
         with:
           prefix-key: ${{ matrix.job.os }}
 
-      - name: Setup vcpkg with Github Actions binary cache
+      - name: Restore vcpkg installed cache
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed
+          key: vcpkg-windows-${{ env.VCPKG_COMMIT_ID }}-${{ matrix.job.vcpkg-triplet }}
+          restore-keys: |
+            vcpkg-windows-${{ env.VCPKG_COMMIT_ID }}-
+
+      - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgDirectory: C:\vcpkg
@@ -459,6 +458,13 @@ jobs:
           fi
           head -n 100 "${VCPKG_ROOT}/buildtrees/ffmpeg/build-${{ matrix.job.vcpkg-triplet }}-rel-out.log" || true
         shell: bash
+
+      - name: Save vcpkg installed cache
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: C:\vcpkg\installed
+          key: vcpkg-windows-${{ env.VCPKG_COMMIT_ID }}-${{ matrix.job.vcpkg-triplet }}
           
       - name: magick stuff
         if: ${{ env.iconlink_url != 'false' }}
@@ -494,8 +500,12 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          cp ./src/ui.rs ./src/ui.rs.bak
-          b64=$(base64 -w0 < ./res/icon.png)
+          IMAGE_PATH="./res/icon.png"
+          if [ ! -f "$IMAGE_PATH" ]; then
+            echo "Error: Image file '$IMAGE_PATH' not found or is a directory."
+            exit 1
+          fi
+          b64=$(base64 -w0 "$IMAGE_PATH")
           perl -0777 -pe "s|iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHL[A-Za-z0-9+/=]+|$b64|g" -i.bak ./src/ui.rs
           b64=""
 
@@ -509,19 +519,6 @@ jobs:
           # false (which would also disable TCP encryption and UDP logic).
           sed -i -e 's#if is_local || peer_nat_type == NatType::SYMMETRIC {#if is_local || peer_nat_type == NatType::SYMMETRIC || !key.is_empty() {#' ./src/client.rs
           grep -n "key.is_empty()" ./src/client.rs || true
-
-      - name: add cycle monitors to toolbar
-        if: env.cycleMonitor == 'true'
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          retry_wait_seconds: 15
-          shell: pwsh
-          continue_on_error: true
-          command: |
-            Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/cycle_monitor.diff?ref=${{ github.ref_name }}" -OutFile cycle_monitor.diff
-            git apply cycle_monitor.diff
 
       - name: use X for offline display instead of orange circle
         if: env.xOffline == 'true'
@@ -538,7 +535,7 @@ jobs:
 
       - name: removeNewVersionNotif
         continue-on-error: true
-        if: env.removeNewVersionNotif == 'true' && env.backupitUpdateManifest == ''
+        if: env.removeNewVersionNotif == 'true'
         shell: bash
         run: | 
           sed -i -e 's|updateUrl.isNotEmpty|false|' ./flutter/lib/desktop/pages/desktop_home_page.dart
@@ -590,14 +587,6 @@ jobs:
           # Windows: build RustDesk
           python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec ${{ matrix.job.build-args }}
           mv ./flutter/build/windows/x64/runner/Release ./rustdesk
-
-      - name: Verify compiled RustDesk version
-        shell: pwsh
-        run: |
-          $output = (& .\rustdesk\rustdesk.exe --version 2>&1 | Out-String).Trim()
-          if ($LASTEXITCODE -ne 0 -or $output -notmatch ('(?m)^' + [regex]::Escape($env:VERSION) + '$')) {
-            throw "Compiled client reported '$output' but the selected version is '$env:VERSION'"
-          }
  
           # Download usbmmidd_v2.zip and extract it to ./rustdesk
           Invoke-WebRequest -Uri https://github.com/rustdesk-org/rdev/releases/download/usbmmidd_v2/usbmmidd_v2.zip -OutFile usbmmidd_v2.zip
@@ -687,9 +676,17 @@ jobs:
 
       - name: sign dlls
         continue-on-error: true
-        shell: pwsh
+        shell: bash
         run: |
-          .\.github\scripts\sign_windows_archive.ps1 -InputZip ./rustdesk/unsigned_files.zip -OutputZip ./rustdesk/signed_files.zip
+          if [ ! -z "${{ secrets.SIGN_BASE_URL }}" ] && [ ! -z "${{ secrets.SIGN_API_KEY }}" ]; then
+            curl -X POST -F "file=@./rustdesk/unsigned_files.zip" \
+              -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" \
+              -m 900 \
+              "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./rustdesk/signed_files.zip
+          else
+            echo "Signing skipped - signing URL or API key not configured"
+            cp ./rustdesk/unsigned_files.zip ./rustdesk/signed_files.zip
+          fi
 
       - name: unzip dlls
         continue-on-error: true
@@ -724,10 +721,8 @@ jobs:
         continue-on-error: true
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          $myappname = "${{ env.appname }}" -replace '\s','_'
-          cp "rustdesk/${{ env.appname }}.exe" "rustdesk/${myappname}.exe" -ErrorAction SilentlyContinue
           pushd ./res/msi
-          python preprocess.py --app-name "$myappname" --arp -d ../../rustdesk
+          python preprocess.py --app-name "${{ env.appname }}" --arp -d ../../rustdesk
           nuget restore msi.sln
           msbuild msi.sln -p:Configuration=Release -p:Platform=x64 /p:TargetVersion=Windows10
           cp ./Package/bin/x64/Release/en-us/Package.msi ../../SignOutput/rustdesk-latest.msi
@@ -742,9 +737,17 @@ jobs:
 
       - name: sign exe and msi
         continue-on-error: true
-        shell: pwsh
+        shell: bash
         run: |
-          .\.github\scripts\sign_windows_archive.ps1 -InputZip ./SignOutput/unsigned_files.zip -OutputZip ./SignOutput/signed_files.zip
+          if [ ! -z "${{ secrets.SIGN_BASE_URL }}" ] && [ ! -z "${{ secrets.SIGN_API_KEY }}" ]; then
+            curl -X POST -F "file=@./SignOutput/unsigned_files.zip" \
+              -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" \
+              -m 900 \
+              "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./SignOutput/signed_files.zip
+          else
+            echo "Signing skipped - signing URL or API key not configured"
+            cp ./SignOutput/unsigned_files.zip ./SignOutput/signed_files.zip
+          fi
 
       - name: unzip exe and msi
         continue-on-error: true
@@ -793,21 +796,7 @@ jobs:
     continue-on-error: true
     if: always()
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-      - name: Delete encrypted build config from rdgen
-        uses: ./.github/actions/cleanup-encrypted-secrets
-        continue-on-error: true
-        with:
-          zip_url_json: ${{ inputs.zip_url }}
-          zip_password: ${{ secrets.ZIP_PASSWORD }}
-      - name: Delete bridge artifact
+      - name: Delete secrets artifact
         uses: geekyeggo/delete-artifact@v5
-        continue-on-error: true
         with:
-          name: bridge-artifact
-      - name: Delete topmost window artifact
-        uses: geekyeggo/delete-artifact@v5
-        continue-on-error: true
-        with:
-          name: topmostwindow-artifacts
+          name: encrypted-secrets-zip
