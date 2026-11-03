@@ -158,7 +158,8 @@ def generate_custom_client(params, full_url):
     direction = params.get('direction', 'both')
     installation = params.get('installation', 'installationY')
     settings = params.get('settings', 'settingsY')
-    appname = safe_app_name(params.get('appname', ''))
+    appname_display = safe_app_name(params.get('appname', ''))
+    appname = safe_app_name(params.get('appname', '')).replace(' ', '')
     filename = safe_filename(params.get('exename', ''))
     compname = params.get('compname', '')
     if not compname:
@@ -237,7 +238,7 @@ def generate_custom_client(params, full_url):
     if settings == "settingsN":
         decodedCustom['disable-settings'] = 'Y'
     if appname.upper != "rustdesk".upper and appname != "":
-        decodedCustom['app-name'] = appname
+        decodedCustom['app-name'] = appname_display
     decodedCustom['override-settings'] = {}
     decodedCustom['default-settings'] = {}
     if permPass != "":

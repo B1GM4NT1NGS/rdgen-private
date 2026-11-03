@@ -376,7 +376,6 @@ jobs:
             python allowCustom.py
             curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/removeSetupServerTip.diff?ref=${{ github.ref_name }}" -o removeSetupServerTip.diff
             git apply removeSetupServerTip.diff
-            # sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
             echo -n '${{ env.custom }}' > ./custom_.txt
           
       - name: change url to custom
@@ -1445,6 +1444,7 @@ jobs:
                 for FILE in $(echo $FILES | sed "s/\n/ /g"); do
                   sed -ie "s|rustdesk|${{ env.appname }}|g" $FILE
                 done
+                mkdir -p %{buildroot}/tmpdeb/usr/lib/rustdesk
                 for file in "./res/rpm-flutter.spec" "./res/rpm-flutter-suse.spec"; do
                   sed -ie "s|^\(URL:\s*\).*|\1${{ env.downloadLink }}|g" "$file"
                   sed -ie "s|^\(Vendor:\s*\).*|\1${{ env.compname }}|g" "$file"
