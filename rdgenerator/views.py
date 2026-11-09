@@ -120,7 +120,7 @@ def generate_custom_client(params, full_url):
     selfhosted = bool(_settings.SH_SECRET and _settings.SH_SECRET == user_secret)
     platform = params.get('platform', 'windows')
     workflow_platform = 'windows' if platform == 'windows-admin' else platform
-    version = params.get('version', '1.5.0')
+    version = params.get('version', '1.5.1')
     app_version = params.get('app_version', '')
     # app_version overrides the version string embedded in the built client
     # without changing the git tag that version selects. If left empty, the
