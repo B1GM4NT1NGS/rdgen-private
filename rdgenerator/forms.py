@@ -8,6 +8,7 @@ import os
 
 
 FALLBACK_VERSION_CHOICES = [
+    ('1.5.3', '1.5.3'),
     ('master', 'nightly'),
     ('1.5.1', '1.5.1'),
     ('1.5.0', '1.5.0'),
@@ -73,7 +74,7 @@ class GenerateForm(forms.Form):
     sh_secret_field = forms.CharField(required=False)
     #Platform
     platform = forms.ChoiceField(choices=[('windows','Windows 64Bit'),('windows-x86','Windows 32Bit'),('windows-admin','Windows Admin'),('linux','Linux'),('android','Android'),('macos','macOS')], initial='windows')
-    version = forms.ChoiceField(choices=FALLBACK_VERSION_CHOICES, initial='1.5.1')
+    version = forms.ChoiceField(choices=FALLBACK_VERSION_CHOICES, initial='1.5.3')
     help_text="'master' is the development version (nightly build) with the latest features but may be less stable"
     delayFix = forms.BooleanField(initial=True, required=False)
 
