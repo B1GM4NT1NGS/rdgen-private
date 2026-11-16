@@ -429,10 +429,31 @@ def generate_custom_client(params, full_url):
                 "log_url": github_data.get('html_url')
             }
         else:
+            code = response.status_code
+            reason = {
+                401: "GitHub credentials were rejected.",
+                403: "Check GitHub Actions write permissions and account restrictions.",
+                404: "Check the configured repository, branch, and workflow access.",
+                422: "GitHub could not validate the workflow, branch, or inputs.",
+                429: "GitHub rate limit reached.",
+            }.get(code, "GitHub did not accept the workflow dispatch.")
+            if code == 422:
+                try:
+                    detail = response.json().get("message", "")
+                except (ValueError, AttributeError):
+                    detail = ""
+                for prefix in ("Unexpected inputs", "No ref found", "Workflow does not have"):
+                    if isinstance(detail, str) and detail.startswith(prefix):
+                        reason = {
+                            "Unexpected inputs": "The workflow does not accept one or more build inputs.",
+                            "No ref found": "The configured branch does not exist.",
+                            "Workflow does not have": "The selected workflow cannot be dispatched manually.",
+                        }[prefix]
+                        break
             return {
                 "success": False,
-                "error": "GitHub rejected the start request",
-                "status_code": 500
+                "error": f"GitHub rejected the build request (HTTP {code}). {reason}",
+                "status_code": 502,
             }
     except Exception as e:
         return {
