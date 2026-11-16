@@ -442,6 +442,16 @@ def generate_custom_client(params, full_url):
                     detail = response.json().get("message", "")
                 except (ValueError, AttributeError):
                     detail = ""
+                if isinstance(detail, str):
+                    # Don't echo credentials, temporary artifact references or URLs.
+                    for secret in (_settings.GHBEARER, _settings.ZIP_PASSWORD, _settings.SH_SECRET, zip_filename, zip_url):
+                        if secret:
+                            detail = detail.replace(str(secret), "[redacted]")
+                    detail = re.sub(r"https?://[^\s]+", "[URL]", detail)
+                    detail = re.sub(r"(?:github_pat_|gh[pousr]_)[A-Za-z0-9_]+", "[redacted]", detail)
+                    detail = " ".join(detail.split())[:400]
+                    if detail:
+                        reason = detail
                 for prefix in ("Unexpected inputs", "No ref found", "Workflow does not have"):
                     if isinstance(detail, str) and detail.startswith(prefix):
                         reason = {
