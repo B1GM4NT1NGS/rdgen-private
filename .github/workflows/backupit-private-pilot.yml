@@ -1,0 +1,137 @@
+name: BackupIT private updater pilot
+
+on:
+  push:
+    branches: [backupit/private-updater-pilot]
+    paths:
+      - .github/workflows/backupit-private-pilot.yml
+      - .github/patches/backupit_private_pilot.py
+      - .github/patches/backupit_private_feed.rs
+  workflow_dispatch:
+    inputs:
+      endpoint:
+        description: Isolated HTTPS pilot feed endpoint
+        required: true
+        type: string
+      public_key:
+        description: Pilot Ed25519 public verification key in hex
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  PILOT_RUSTDESK: 95cca3f661f635b3cc85c04935fe8d96d8f432ef
+  VCPKG_COMMIT_ID: 9e593bb18ea69cc5095e012465dcd675a822ed0d
+  VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
+
+jobs:
+  bridge:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          repository: rustdesk/rustdesk
+          ref: ${{ env.PILOT_RUSTDESK }}
+          submodules: recursive
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y clang cmake libclang-dev libgtk-3-dev llvm-dev nasm ninja-build pkg-config
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
+        with:
+          toolchain: '1.75'
+          components: rustfmt
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          channel: stable
+          flutter-version: '3.22.3'
+          cache: true
+      - run: |
+          cargo install cargo-expand --version 1.0.95 --locked
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid --locked
+          sed -i -e 's/extended_text: 14.0.0/extended_text: 13.0.0/g' flutter/pubspec.yaml
+          (cd flutter && flutter pub get)
+          flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pilot-bridge
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            src/bridge_generated.rs
+            src/bridge_generated.io.rs
+            flutter/lib/generated_bridge.dart
+            flutter/lib/generated_bridge.freezed.dart
+
+  windows:
+    needs: bridge
+    runs-on: windows-2022
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: rustdesk
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          path: rdgen
+          persist-credentials: false
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          path: rustdesk
+          repository: rustdesk/rustdesk
+          ref: ${{ env.PILOT_RUSTDESK }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: pilot-bridge
+          path: rustdesk
+      - name: Apply only the private updater patch
+        env:
+          # Push builds are compile checks only: this endpoint has no release feed.
+          BACKUPIT_PILOT_ENDPOINT: ${{ inputs.endpoint || 'https://backupit.co.uk/000000000000000000000000/index.php' }}
+          BACKUPIT_PILOT_PUBLIC_KEY: ${{ inputs.public_key || 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a' }}
+          BACKUPIT_PILOT_CHANNEL: windows-admin
+        run: |
+          python ../rdgen/.github/patches/backupit_private_pilot.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --check
+      - uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0
+        with:
+          version: 15.0.6
+      - uses: subosito/flutter-action@2783a3f08e1baf891508463f8c6653c258246225
+        with:
+          channel: stable
+          flutter-version: '3.24.5'
+          architecture: x64
+      - name: Apply upstream Flutter compatibility patch
+        shell: bash
+        run: git -C "$(dirname "$(dirname "$(which flutter)")")" apply "$PWD/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
+        with:
+          toolchain: '1.75'
+          targets: x86_64-pc-windows-msvc
+      - uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+      - uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2
+        with:
+          vcpkgDirectory: C:\vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+      - name: Install native dependencies
+        shell: bash
+        env:
+          VCPKG_DEFAULT_HOST_TRIPLET: x64-windows-static
+        run: "$VCPKG_ROOT/vcpkg install --triplet x64-windows-static --x-install-root=\"$VCPKG_ROOT/installed\""
+      - name: Build pilot candidate
+        run: python build.py --portable --flutter --skip-portable-pack --hwcodec
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: windows-x64-private-updater-pilot
+          path: rustdesk/flutter/build/windows/x64/runner/Release/
+          if-no-files-found: error
+          retention-days: 1
