@@ -2,11 +2,12 @@ name: BackupIT private updater pilot
 
 on:
   push:
-    branches: [backupit/private-updater-pilot]
+    branches: [backupit/private-updater-pilot, backupit/private-updater-staging]
     paths:
       - .github/workflows/backupit-private-pilot.yml
       - .github/patches/backupit_private_pilot.py
       - .github/patches/backupit_private_feed.rs
+      - .github/patches/private-pilot-public-key.txt
   workflow_dispatch:
     inputs:
       endpoint:
@@ -17,6 +18,14 @@ on:
         description: Pilot Ed25519 public verification key in hex
         required: true
         type: string
+      runtime_endpoint:
+        description: Read the real pilot feed URL only on the isolated test PC
+        type: boolean
+        default: false
+      build_pair:
+        description: Build separate source and target installers for the install test
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -68,6 +77,10 @@ jobs:
     needs: bridge
     runs-on: windows-2022
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        role: ${{ fromJSON((inputs.build_pair || github.ref_name == 'backupit/private-updater-staging') && '["source", "target"]' || '["source"]') }}
     defaults:
       run:
         working-directory: rustdesk
@@ -89,11 +102,18 @@ jobs:
           path: rustdesk
       - name: Apply only the private updater patch
         env:
-          # Push builds are compile checks only: this endpoint has no release feed.
+          # The isolated staging build gets its actual endpoint at runtime.
           BACKUPIT_PILOT_ENDPOINT: ${{ inputs.endpoint || 'https://backupit.co.uk/000000000000000000000000/index.php' }}
           BACKUPIT_PILOT_PUBLIC_KEY: ${{ inputs.public_key || 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a' }}
           BACKUPIT_PILOT_CHANNEL: windows-admin
+          BACKUPIT_PILOT_ALLOW_RUNTIME_ENDPOINT: ${{ inputs.runtime_endpoint && '1' || '0' }}
+          BACKUPIT_PILOT_BUILD_ID: pilot-${{ github.sha }}-${{ matrix.role }}
+          BACKUPIT_PILOT_BUILD_VERSION: ${{ matrix.role == 'target' && 'BackupIT-2026.01.01.2' || 'BackupIT-2026.01.01.1' }}
         run: |
+          if ($env:GITHUB_REF_NAME -eq 'backupit/private-updater-staging') {
+            $env:BACKUPIT_PILOT_PUBLIC_KEY = (Get-Content -LiteralPath '../rdgen/.github/patches/private-pilot-public-key.txt' -Raw).Trim()
+            $env:BACKUPIT_PILOT_ALLOW_RUNTIME_ENDPOINT = '1'
+          }
           python ../rdgen/.github/patches/backupit_private_pilot.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git diff --check
@@ -128,10 +148,16 @@ jobs:
           VCPKG_DEFAULT_HOST_TRIPLET: x64-windows-static
         run: "$VCPKG_ROOT/vcpkg install --triplet x64-windows-static --x-install-root=\"$VCPKG_ROOT/installed\""
       - name: Build pilot candidate
-        run: python build.py --portable --flutter --skip-portable-pack --hwcodec
+        run: |
+          python build.py --portable --flutter --hwcodec
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path -LiteralPath 'rustdesk-1.5.3-install.exe' -PathType Leaf)) {
+            throw 'The Windows self-extracting update package was not built'
+          }
+          Get-FileHash -Algorithm SHA256 -LiteralPath 'rustdesk-1.5.3-install.exe'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: windows-x64-private-updater-pilot
-          path: rustdesk/flutter/build/windows/x64/runner/Release/
+          name: windows-x64-private-updater-pilot-${{ matrix.role }}
+          path: rustdesk/rustdesk-1.5.3-install.exe
           if-no-files-found: error
           retention-days: 1

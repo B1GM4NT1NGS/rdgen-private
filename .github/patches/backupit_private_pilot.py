@@ -5,19 +5,28 @@ from pathlib import Path
 import re
 
 
+FIXTURE_KEY = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+
+
 def replace(text, old, new):
     if text.count(old) != 1:
         raise ValueError(f"Unsupported RustDesk source: expected one {old.splitlines()[0]!r}")
     return text.replace(old, new, 1)
 
 
-def patch(root, endpoint, channel, public_key):
+def patch(root, endpoint, channel, public_key, build_id="", runtime_endpoint=False, installed_version=""):
     if not re.fullmatch(r"https://backupit\.co\.uk/[a-f0-9]{24}/index\.php", endpoint):
         raise ValueError("Invalid pilot update endpoint")
     if channel not in {"windows", "windows-admin", "windows-x86", "windows-ask-only", "windows-ask-pass", "macos"}:
         raise ValueError("Pilot does not support this client platform")
     if not re.fullmatch(r"[a-f0-9]{64}", public_key):
         raise ValueError("Expected a 32-byte Ed25519 public key in hex")
+    if runtime_endpoint and public_key in {FIXTURE_KEY, "0" * 64}:
+        raise ValueError("A real pilot verification key is required for a runtime endpoint")
+    if build_id and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,160}", build_id):
+        raise ValueError("Invalid pilot build ID")
+    if installed_version and not re.fullmatch(r"BackupIT-\d{4}\.\d{2}\.\d{2}\.\d{1,9}", installed_version):
+        raise ValueError("Invalid installed pilot version")
     changes = {}
 
     def edit(path, old, new):
@@ -30,15 +39,36 @@ def patch(root, endpoint, channel, public_key):
 pub(crate) const ENDPOINT: &str = "{endpoint}";
 const CHANNEL: &str = "{channel}";
 const PUBLIC_KEY: [u8; 32] = [{key}];
+const BUILD_ID: &str = "{build_id}";
+const INSTALLED_VERSION: &str = "{installed_version}";
+const RUNTIME_ENDPOINT: bool = {str(runtime_endpoint).lower()};
+
+pub(crate) fn pilot_endpoint() -> String {{
+    if RUNTIME_ENDPOINT {{
+        if let Ok(endpoint) = std::env::var("BACKUPIT_PILOT_RUNTIME_ENDPOINT") {{
+            if endpoint.strip_prefix(ORIGIN).and_then(|url| url.strip_suffix("/index.php"))
+                .is_some_and(|directory| lower_hex(directory, 24)) {{
+                return endpoint;
+            }}
+        }}
+    }}
+    ENDPOINT.to_owned()
+}}
 
 pub(crate) fn pilot_latest(format: &str) -> ResultType<Option<Release>> {{
     let token = std::env::var("BACKUPIT_PILOT_TOKEN")?;
-    let installed = std::env::var("BACKUPIT_PILOT_INSTALLED_VERSION")?;
-    PrivateFeed::new(ENDPOINT, CHANNEL, &token)?.latest(PUBLIC_KEY, format, &installed)
+    let installed = if INSTALLED_VERSION.is_empty() {{
+        std::env::var("BACKUPIT_PILOT_INSTALLED_VERSION")?
+    }} else {{
+        INSTALLED_VERSION.to_owned()
+    }};
+    let endpoint = pilot_endpoint();
+    let release = PrivateFeed::new(&endpoint, CHANNEL, &token)?.latest(PUBLIC_KEY, format, &installed)?;
+    Ok(release.filter(|value| !value.is_installed_build(BUILD_ID)))
 }}
 
 pub(crate) fn pilot_package_name(url: &str) -> Option<&str> {{
-    let prefix = format!("{{ENDPOINT}}?channel={{CHANNEL}}&file=");
+    let prefix = format!("{{}}?channel={{CHANNEL}}&file=", pilot_endpoint());
     let name = url.strip_prefix(&prefix)?;
     let (id, ext) = name.split_once('.')?;
     (lower_hex(id, 32) && matches!(ext, "exe" | "msi" | "dmg")).then_some(name)
@@ -54,16 +84,16 @@ pub(crate) fn pilot_package_name(url: &str) -> Option<&str> {{
             let format = if cfg!(target_os = "macos") { "dmg" } else { "exe" };
             clear_software_update_url();
             if let Ok(Some(_)) = crate::backupit_private_feed::pilot_latest(format) {
-                let url = crate::backupit_private_feed::ENDPOINT;
-                let event = serde_json::json!({"name": "check_software_update_finish", "url": url});
-                *SOFTWARE_UPDATE_URL.lock().unwrap() = url.to_owned();
+                let url = crate::backupit_private_feed::pilot_endpoint();
+                let event = serde_json::json!({"name": "check_software_update_finish", "url": &url});
+                *SOFTWARE_UPDATE_URL.lock().unwrap() = url;
                 let _ = crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, event.to_string());
             }
         });
         return;
     }
 ''')
-    edit("src/updater/artifact.rs", "    let release_id = release_id_from_update_url(update_url)?;", '''    if update_url == crate::backupit_private_feed::ENDPOINT {
+    edit("src/updater/artifact.rs", "    let release_id = release_id_from_update_url(update_url)?;", '''    if update_url == crate::backupit_private_feed::pilot_endpoint().as_str() {
         let release = crate::backupit_private_feed::pilot_latest(query.format)?
             .ok_or_else(|| hbb_common::anyhow::anyhow!("No newer BackupIT release is available"))?;
         #[cfg(target_os = "macos")]
@@ -113,4 +143,6 @@ pub(crate) fn pilot_package_name(url: &str) -> Option<&str> {{
 
 if __name__ == "__main__":
     patch(Path.cwd(), os.environ["BACKUPIT_PILOT_ENDPOINT"], os.environ["BACKUPIT_PILOT_CHANNEL"],
-          os.environ["BACKUPIT_PILOT_PUBLIC_KEY"])
+          os.environ["BACKUPIT_PILOT_PUBLIC_KEY"], os.environ.get("BACKUPIT_PILOT_BUILD_ID", os.environ.get("uuid", "")),
+          os.environ.get("BACKUPIT_PILOT_ALLOW_RUNTIME_ENDPOINT") == "1",
+          os.environ.get("BACKUPIT_PILOT_BUILD_VERSION", ""))

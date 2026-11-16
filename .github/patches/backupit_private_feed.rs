@@ -29,6 +29,14 @@ pub(crate) struct Release {
     format: String,
     pub size: u64,
     pub sha256: String,
+    #[serde(default)]
+    pub build_id: String,
+}
+
+impl Release {
+    pub(crate) fn is_installed_build(&self, installed_build_id: &str) -> bool {
+        !installed_build_id.is_empty() && self.build_id == installed_build_id
+    }
 }
 
 pub(crate) struct PrivateFeed<'a> {
@@ -75,7 +83,9 @@ impl<'a> PrivateFeed<'a> {
     }
 
     fn request(&self, url: &str) -> ResultType<Response> {
-        let response = self.client.get(url).header("X-BackupIT-Update-Token", self.token).send()?;
+        let mut token = reqwest::header::HeaderValue::from_str(self.token)?;
+        token.set_sensitive(true);
+        let response = self.client.get(url).header("X-BackupIT-Update-Token", token).send()?;
         ensure!(response.status().is_success(), "BackupIT update request returned {}", response.status());
         Ok(response)
     }
@@ -161,6 +171,7 @@ mod tests {
             schema: 1, channel: "windows-admin".into(), version: "BackupIT-2026.11.16.2".into(),
             url: String::new(), format: "exe".into(), size: package.len() as u64,
             sha256: format!("{:x}", Sha256::digest(package)),
+            build_id: String::new(),
         };
         let mut stage = Vec::new();
         verify_stream(&package[..], &mut stage, &release).unwrap();
@@ -181,14 +192,17 @@ mod tests {
         let make_envelope = |channel: &str, url: &str| {
             let raw = serde_json::to_vec(&json!({
                 "schema":1, "channel":channel, "version":"BackupIT-2026.11.16.2",
-                "url":url, "format":"exe", "size":123, "sha256":"a".repeat(64)
+                "url":url, "format":"exe", "size":123, "sha256":"a".repeat(64), "build_id":"generated-build-2"
             })).unwrap();
             let signature = sign_detached(&[CONTEXT, raw.as_slice()].concat(), &secret);
             serde_json::to_vec(&json!({"metadata":STANDARD.encode(raw), "signature":STANDARD.encode(signature.to_bytes())})).unwrap()
         };
         let url = format!("{}{}.exe", feed.prefix(), "b".repeat(32));
         let envelope = make_envelope("windows-admin", &url);
-        assert!(feed.verify(&envelope, public.0, "exe", "BackupIT-2026.11.16.1").unwrap().is_some());
+        let release = feed.verify(&envelope, public.0, "exe", "BackupIT-2026.11.16.1").unwrap().unwrap();
+        assert!(release.is_installed_build("generated-build-2"));
+        assert!(!release.is_installed_build("generated-build-1"));
+        assert!(!release.is_installed_build(""));
         assert!(feed.verify(&envelope, public.0, "exe", "BackupIT-2026.11.16.2").unwrap().is_none());
         assert!(feed.verify(&envelope, public.0, "exe", "BackupIT-2026.11.16.10").unwrap().is_none());
         assert!(feed.verify(&envelope, [0; 32], "exe", "BackupIT-2026.11.16.1").is_err());
