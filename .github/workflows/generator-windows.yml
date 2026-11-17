@@ -13,6 +13,18 @@ on:
         required: true
         default: ''
         type: string
+      signed_update_pilot:
+        description: Build a Windows x64 pilot with the signed private updater
+        type: boolean
+        default: false
+      signed_update_public_key:
+        description: Ed25519 public verification key for the test feed (hex)
+        type: string
+        default: ''
+      signed_update_installed_version:
+        description: BackupIT release version embedded in this pilot
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -286,10 +298,39 @@ jobs:
             # Remove Setup Server Tip
             Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/removeSetupServerTip.diff?ref=${{ github.ref_name }}" -OutFile removeSetupServerTip.diff
             git apply removeSetupServerTip.diff
-            Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_terminal_cm_hidden.py?ref=${{ github.ref_name }}" -OutFile backupit_terminal_cm_hidden.py
-            python backupit_terminal_cm_hidden.py
-            Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_update_channel.py?ref=${{ github.ref_name }}" -OutFile backupit_update_channel.py
-            python backupit_update_channel.py
+            if ('${{ inputs.signed_update_pilot }}' -ne 'true') {
+              Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_terminal_cm_hidden.py?ref=${{ github.ref_name }}" -OutFile backupit_terminal_cm_hidden.py
+              python backupit_terminal_cm_hidden.py
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_update_channel.py?ref=${{ github.ref_name }}" -OutFile backupit_update_channel.py
+              python backupit_update_channel.py
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+
+      - name: Apply authenticated updater for a branded Windows pilot
+        if: inputs.signed_update_pilot
+        shell: pwsh
+        env:
+          BACKUPIT_PILOT_ENDPOINT: https://backupit.co.uk/000000000000000000000000/index.php
+          BACKUPIT_PILOT_ALLOW_RUNTIME_ENDPOINT: '1'
+          BACKUPIT_PILOT_BRANDED: '1'
+          BACKUPIT_PILOT_PUBLIC_KEY: ${{ inputs.signed_update_public_key }}
+          BACKUPIT_PILOT_BUILD_VERSION: ${{ inputs.signed_update_installed_version }}
+        run: |
+          if ($env:VERSION -ne '1.5.3' -or $env:backupitUpdateChannel -cnotin @('windows','windows-admin','windows-ask-only','windows-ask-pass')) {
+            throw 'The signed updater pilot requires a Windows x64 channel and RustDesk 1.5.3'
+          }
+          $env:BACKUPIT_PILOT_CHANNEL = $env:backupitUpdateChannel
+          if (!$env:BACKUPIT_PILOT_BUILD_VERSION -or !$env:uuid) {
+            throw 'The signed updater pilot requires a build ID and release version'
+          }
+          $headers = @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"}
+          $base = "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches"
+          foreach ($file in 'backupit_private_pilot.py','backupit_private_feed.rs') {
+            Invoke-WebRequest -Headers $headers -Uri "$base/$file`?ref=${{ github.sha }}" -OutFile $file
+          }
+          python backupit_private_pilot.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Enforce BackupIT Ask and Pass approval
         if: env.backupitRequirePasswordAndClick == 'true'

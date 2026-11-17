@@ -22,6 +22,22 @@ def env_default(name, fallback=""):
     return (os.environ.get(name) or fallback or "").strip()
 
 
+def signed_pilot_inputs(branch, workflow, version, channel, has_password):
+    if env_default("RDGEN_SIGNED_UPDATE_PILOT") != "1":
+        return {}
+    if (branch != "backupit/private-updater-staging" or workflow != "generator-windows.yml"
+            or version != "1.5.3"
+            or channel not in {"windows", "windows-admin", "windows-ask-only", "windows-ask-pass"}
+            or has_password):
+        raise ValueError("Signed pilot requires a password-free Windows x64 1.5.3 build on the staging branch")
+    key = env_default("RDGEN_SIGNED_UPDATE_PUBLIC_KEY")
+    release = env_default("RDGEN_SIGNED_UPDATE_BUILD_VERSION")
+    if not re.fullmatch(r"[a-f0-9]{64}", key) or not re.fullmatch(r"BackupIT-\d{4}\.\d{2}\.\d{2}\.\d{1,9}", release):
+        raise ValueError("Signed pilot verification key or release version is missing or invalid")
+    return {"signed_update_pilot": True, "signed_update_public_key": key,
+            "signed_update_installed_version": release}
+
+
 def api_server_url(value=""):
     target = str(value or "").strip()
     if not target:
@@ -316,6 +332,10 @@ def generate_custom_client(params, full_url):
     workflow_file = workflows.get(workflow_platform, workflows['windows'])
     if workflow_platform == 'windows' and selfhosted:
         workflow_file = 'sh-generator-windows.yml'
+    try:
+        pilot_inputs = signed_pilot_inputs(_settings.GHBRANCH, workflow_file, version, update_channel, bool(permPass))
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
     url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/'+workflow_file+'/dispatches'
 
     inputs_raw = {
@@ -377,7 +397,8 @@ def generate_custom_client(params, full_url):
         "ref":_settings.GHBRANCH,
         "inputs":{
             "version":version,
-            "zip_url":zip_url
+            "zip_url":zip_url,
+            **pilot_inputs,
         },
         "return_run_details": True
     } 
