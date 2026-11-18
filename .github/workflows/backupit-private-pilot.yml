@@ -163,11 +163,11 @@ jobs:
           python ../rdgen/.github/patches/allowCustom.py
           python build.py --portable --flutter --skip-portable-pack --hwcodec
           out=flutter/build/windows/x64/runner/Release
-          python -c 'import base64,json,sys; from pathlib import Path; Path(sys.argv[1]).write_bytes(base64.b64encode(json.dumps({"app-name":"BackupIT Pilot","default-settings":{"approve-mode":"click"}}).encode()))' "$out/custom_.txt"
-          mv "$out/rustdesk.exe" "$out/BackupIT Pilot.exe"
+          python -c 'import base64,json,sys; from pathlib import Path; Path(sys.argv[1]).write_bytes(base64.b64encode(json.dumps({"app-name":"BackupIT-Pilot","default-settings":{"approve-mode":"click"}}).encode()))' "$out/custom_.txt"
+          mv "$out/rustdesk.exe" "$out/BackupIT-Pilot.exe"
           cd libs/portable
           python -m pip install -r requirements.txt
-          python generate.py -f "../../$out" -o . -e "../../$out/BackupIT Pilot.exe"
+          python generate.py -f "../../$out" -o . -e "../../$out/BackupIT-Pilot.exe"
           cd ../..
           mv target/release/rustdesk-portable-packer.exe rustdesk-1.5.3-install.exe
           sha256sum rustdesk-1.5.3-install.exe

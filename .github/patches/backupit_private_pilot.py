@@ -14,6 +14,8 @@ def validate_branded_pilot(encoded):
     config = json.loads(base64.b64decode(encoded, validate=True))
     if not isinstance(config, dict) or not config.get("app-name"):
         raise ValueError("Branded pilot needs a named custom configuration")
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", config["app-name"]):
+        raise ValueError("Windows pilot app name may contain only letters, numbers, hyphens and underscores")
     if config.get("password"):
         raise ValueError("A branded updater pilot must not embed a connection password")
 
