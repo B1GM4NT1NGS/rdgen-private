@@ -88,6 +88,18 @@ pub(crate) fn pilot_package_name(url: &str) -> Option<&str> {{
 '''
     module = Path(__file__).with_name("backupit_private_feed.rs").read_text(encoding="utf-8")
     changes[root / "src/backupit_private_feed.rs"] = module + adapter
+    edit("flutter/lib/desktop/pages/desktop_home_page.dart", """  Widget buildHelpCards(String updateUrl) {
+    if (!bind.isCustomClient() &&
+        updateUrl.isNotEmpty &&
+        !isCardClosed &&
+        bind.mainUriPrefixSync().contains('rustdesk')) {""", """  Widget buildHelpCards(String updateUrl) {
+    final privateUpdate = RegExp(
+      r'^https://backupit\\.co\\.uk/[0-9a-f]{24}/index\\.php$',
+    ).hasMatch(updateUrl);
+    if ((privateUpdate || !bind.isCustomClient()) &&
+        updateUrl.isNotEmpty &&
+        !isCardClosed &&
+        (privateUpdate || bind.mainUriPrefixSync().contains('rustdesk'))) {""")
     edit("src/lib.rs", "pub(crate) mod update_metadata;", "pub(crate) mod update_metadata;\nmod backupit_private_feed;")
     edit("src/common.rs", "pub fn check_software_update() {\n", '''pub fn check_software_update() {
     #[cfg(all(feature = "flutter", any(target_os = "windows", target_os = "macos")))]
