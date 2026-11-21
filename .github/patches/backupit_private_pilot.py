@@ -88,6 +88,12 @@ pub(crate) fn pilot_package_name(url: &str) -> Option<&str> {{
 '''
     module = Path(__file__).with_name("backupit_private_feed.rs").read_text(encoding="utf-8")
     changes[root / "src/backupit_private_feed.rs"] = module + adapter
+    edit("flutter/lib/common.dart", """void checkUpdate() {
+  if (!isWeb) {
+    if (!bind.isCustomClient()) {""", """void checkUpdate() {
+  if (!isWeb) {
+    // Native code retains the custom-client guard unless a private grant exists.
+    {""")
     edit("flutter/lib/desktop/pages/desktop_home_page.dart", """  Widget buildHelpCards(String updateUrl) {
     if (!bind.isCustomClient() &&
         updateUrl.isNotEmpty &&

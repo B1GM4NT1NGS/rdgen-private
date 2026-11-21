@@ -2,7 +2,7 @@ name: BackupIT private updater pilot
 
 on:
   push:
-    branches: [backupit/private-updater-pilot, backupit/private-updater-staging]
+      branches: [backupit/private-updater-pilot]
     paths:
       - .github/workflows/backupit-private-pilot.yml
       - .github/patches/backupit_private_pilot.py
