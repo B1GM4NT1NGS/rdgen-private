@@ -57,18 +57,49 @@ const RUNTIME_ENDPOINT: bool = {str(runtime_endpoint).lower()};
 
 pub(crate) fn pilot_endpoint() -> String {{
     if RUNTIME_ENDPOINT {{
+        if std::env::var("BACKUPIT_PILOT_TOKEN").ok().is_some_and(|value| lower_hex(&value, 64)) {{
         if let Ok(endpoint) = std::env::var("BACKUPIT_PILOT_RUNTIME_ENDPOINT") {{
             if endpoint.strip_prefix(ORIGIN).and_then(|url| url.strip_suffix("/index.php"))
                 .is_some_and(|directory| lower_hex(directory, 24)) {{
                 return endpoint;
             }}
         }}
+        }} else if let Some((endpoint, _)) = local_update_grant() {{
+            return endpoint;
+        }}
     }}
     ENDPOINT.to_owned()
 }}
 
+#[cfg(target_os = "windows")]
+fn local_update_grant() -> Option<(String, String)> {{
+    use std::io::Read;
+    let path = std::path::PathBuf::from(std::env::var_os("LOCALAPPDATA")?)
+        .join("BackupIT").join("update-access.json");
+    let mut bytes = Vec::new();
+    std::fs::File::open(path).ok()?.take(4097).read_to_end(&mut bytes).ok()?;
+    if bytes.len() > 4096 {{ return None; }}
+    let grant: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    let endpoint = grant.get("endpoint")?.as_str()?;
+    let token = grant.get("token")?.as_str()?;
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
+    if grant.get("channel")?.as_str()? != CHANNEL || grant.get("expires")?.as_u64()? <= now
+        || !lower_hex(token, 64)
+        || !endpoint.strip_prefix(ORIGIN).and_then(|url| url.strip_suffix("/index.php"))
+            .is_some_and(|directory| lower_hex(directory, 24)) {{ return None; }}
+    Some((endpoint.to_owned(), token.to_owned()))
+}}
+
+#[cfg(not(target_os = "windows"))]
+fn local_update_grant() -> Option<(String, String)> {{ None }}
+
+pub(crate) fn pilot_token() -> Option<String> {{
+    std::env::var("BACKUPIT_PILOT_TOKEN").ok().filter(|value| lower_hex(value, 64))
+        .or_else(|| if RUNTIME_ENDPOINT {{ local_update_grant().map(|(_, token)| token) }} else {{ None }})
+}}
+
 pub(crate) fn pilot_latest(format: &str) -> ResultType<Option<Release>> {{
-    let token = std::env::var("BACKUPIT_PILOT_TOKEN")?;
+    let token = pilot_token().ok_or_else(|| hbb_common::anyhow::anyhow!("No valid BackupIT update grant"))?;
     let installed = if INSTALLED_VERSION.is_empty() {{
         std::env::var("BACKUPIT_PILOT_INSTALLED_VERSION")?
     }} else {{
@@ -109,7 +140,7 @@ pub(crate) fn pilot_package_name(url: &str) -> Option<&str> {{
     edit("src/lib.rs", "pub(crate) mod update_metadata;", "pub(crate) mod update_metadata;\nmod backupit_private_feed;")
     edit("src/common.rs", "pub fn check_software_update() {\n", '''pub fn check_software_update() {
     #[cfg(all(feature = "flutter", any(target_os = "windows", target_os = "macos")))]
-    if std::env::var_os("BACKUPIT_PILOT_TOKEN").is_some() {
+    if crate::backupit_private_feed::pilot_token().is_some() {
         std::thread::spawn(|| {
             let format = if cfg!(target_os = "macos") { "dmg" } else { "exe" };
             clear_software_update_url();
@@ -143,7 +174,8 @@ pub(crate) fn pilot_package_name(url: &str) -> Option<&str> {{
     }
 ''')
     edit("src/hbbs_http/downloader.rs", "    let client = create_http_client_async_with_url_strict(&request.url).await?;", '''    let update_token = if crate::backupit_private_feed::pilot_package_name(&request.url).is_some() {
-        Some(std::env::var("BACKUPIT_PILOT_TOKEN")?)
+        Some(crate::backupit_private_feed::pilot_token()
+            .ok_or_else(|| hbb_common::anyhow::anyhow!("No valid BackupIT update grant"))?)
     } else {
         None
     };
