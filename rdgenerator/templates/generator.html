@@ -125,6 +125,333 @@
             max-height: 100px;
             margin-top: 10px;
         }
+        .theme-colors {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+        }
+        .theme-color label {
+            margin-bottom: 4px;
+        }
+        .theme-color input[type="text"] {
+            margin-bottom: 0;
+        }
+        .theme-color input[type="color"] {
+            box-sizing: border-box;
+            width: 100%;
+            height: 30px;
+            padding: 0;
+            margin-bottom: 6px;
+            background-color: #222;
+            border: 1px solid #444;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .hint {
+            color: #888;
+            font-weight: normal;
+        }
+        .theme-live {
+            margin-top: 14px;
+        }
+        .theme-live-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            color: #888;
+            font-size: 11px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+        }
+        .theme-live-bar button {
+            width: auto;
+            padding: 3px 10px;
+            margin-left: 0;
+            background: #222;
+            color: #bbb;
+            border: 1px solid #444;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: normal;
+            letter-spacing: 0;
+            text-transform: none;
+        }
+        .theme-live-bar button.is-on {
+            border-color: #0077ff;
+            color: #fff;
+            background: #17325c;
+        }
+        .theme-live-window {
+            --tp-bg: #18191e;
+            --tp-card: #18191e;
+            --tp-accent: #0071ff;
+            --tp-accent-halo: rgba(0, 113, 255, .25);
+            --tp-btn: #0071ff;
+            --tp-ink: #e8edf5;
+            --tp-muted: #97a1b3;
+            --tp-me: #21790b;
+            --tp-title: #18191e;
+            max-width: 420px;
+            overflow: hidden;
+            background: var(--tp-bg);
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+        .theme-live-window[data-mode="light"] {
+            --tp-ink: #1a1d24;
+            --tp-muted: #5c6574;
+        }
+        .theme-live .tp-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--tp-title);
+            border-bottom: 1px solid rgba(127, 127, 127, .22);
+            color: var(--tp-ink);
+            font-size: 12.5px;
+            font-weight: 600;
+        }
+        .theme-live .tp-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--tp-accent);
+            box-shadow: 0 0 0 3px var(--tp-accent-halo);
+        }
+        .theme-live .tp-body {
+            padding: 14px;
+        }
+        .theme-live .tp-card {
+            padding: 14px;
+            background: var(--tp-card);
+            border: 1px solid rgba(127, 127, 127, .22);
+            border-radius: 10px;
+        }
+        .theme-live .tp-id {
+            color: var(--tp-me);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: .08em;
+        }
+        .theme-live .tp-sub {
+            margin: 4px 0 12px;
+            color: var(--tp-muted);
+            font-size: 12px;
+        }
+        .theme-live .tp-btn,
+        .theme-live .tp-btn:hover {
+            width: auto;
+            padding: 7px 14px;
+            background: var(--tp-btn);
+            color: #fff;
+            border: 0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: default;
+        }
+        .theme-live-hint {
+            margin: 8px 0 0;
+            color: #888;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        /* Advanced settings key picker (Default / Override textareas). */
+        .adv-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .adv-toolbar input[type="search"] {
+            flex: 1 1 240px;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 8px;
+            background-color: #222;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+        }
+        .adv-toolbar input[type="search"]:focus {
+            outline: none;
+            border-color: #0077ff;
+        }
+        .adv-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .adv-filters button {
+            width: auto;
+            margin: 0;
+            padding: 4px 10px;
+            background: #222;
+            color: #bbb;
+            border: 1px solid #444;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .adv-filters button:hover {
+            background: #2a2a2a;
+        }
+        .adv-filters button.is-on {
+            border-color: #0077ff;
+            background: #17325c;
+            color: #fff;
+        }
+        .adv-note {
+            min-height: 17px;
+            margin: 8px 0 0;
+            color: #7fb0ff;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .adv-note.is-bad {
+            color: #ff8a80;
+        }
+        .adv-wrap {
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+            gap: 14px;
+            margin-top: 8px;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            .adv-wrap {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+        .adv-catalog {
+            max-height: 520px;
+            overflow-y: auto;
+            background: #0b0b0b;
+            border: 1px solid #333;
+            border-radius: 6px;
+        }
+        .adv-group {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            padding: 10px 12px 4px;
+            background: #0b0b0b;
+            color: #f0a132;
+            font-size: 10.5px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+        }
+        .adv-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 2px 10px;
+            padding: 8px 12px 10px;
+            border-top: 1px solid #222;
+        }
+        .adv-row.is-owned {
+            opacity: .74;
+        }
+        .adv-row.is-future {
+            opacity: .58;
+        }
+        .adv-row.is-in {
+            background: rgba(0, 119, 255, .09);
+        }
+        .adv-k {
+            color: #fff;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12.5px;
+            word-break: break-all;
+        }
+        .adv-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            justify-content: flex-end;
+        }
+        .adv-badge {
+            padding: 1px 6px;
+            border: 1px solid #444;
+            border-radius: 999px;
+            color: #888;
+            font-size: 10px;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .adv-badge.owned {
+            color: #8fb8e8;
+            border-color: #35577c;
+        }
+        .adv-badge.useful {
+            color: #f0a132;
+            border-color: #7a5719;
+        }
+        .adv-badge.future {
+            color: #ff8a80;
+            border-color: #7a3b36;
+        }
+        .adv-badge.placed {
+            color: #6fd68f;
+            border-color: #2f6b42;
+        }
+        .adv-meta {
+            grid-column: 1 / -1;
+            color: #888;
+            font-size: 11.5px;
+            line-height: 1.4;
+        }
+        .adv-vals {
+            color: #bbb;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 11px;
+        }
+        .adv-insert {
+            display: flex;
+            grid-column: 1 / -1;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .adv-insert button {
+            width: auto;
+            margin: 0;
+            padding: 3px 9px;
+            background: #222;
+            color: #bbb;
+            border: 1px solid #444;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        .adv-insert button:hover {
+            background: #17325c;
+            border-color: #0077ff;
+            color: #fff;
+        }
+        .adv-empty {
+            padding: 18px 12px;
+            color: #888;
+            font-size: 12.5px;
+        }
+        .adv-boxes label:first-child {
+            margin-top: 0;
+        }
+        .adv-boxes textarea + label {
+            margin-top: 12px;
+        }
+        .adv-boxes textarea {
+            box-sizing: border-box;
+            min-height: 240px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12.5px;
+            line-height: 1.45;
+            resize: vertical;
+        }
+        .adv-boxes .hint {
+            margin-left: 4px;
+        }
         .save-load-section-container { /* New container for fixed positioning */
             position: fixed;
             top: 20px; /* Adjust as needed */
@@ -282,9 +609,9 @@
         <div class="container">   
             <div class="section">
                 <h2><i class="fas fa-sliders-h"></i> General</h2>
-                    <label for="{{ form.exename.id_for_label }}">Name of the configuration (no spaces or special characters, English characters only):</label>
+                    <label for="{{ form.exename.id_for_label }}">Name of the configuration (used for the downloaded file names; no spaces or special characters, English characters only):</label>
                     {{ form.exename }}<span id="filenameError" class="error"></span><br><br>
-                    <label for="{{ form.appname.id_for_label }}">Custom Application Name (leave blank to use default):</label>
+                    <label for="{{ form.appname.id_for_label }}">Custom Application Name (shown in the app, under the icon and in the Android installer; leave blank to keep RustDesk):</label>
                     {{ form.appname }}<br><br>
                     <label for="{{ form.direction.id_for_label }}">Connection Type:</label>
                     {{ form.direction }}<br><br>
@@ -333,26 +660,6 @@
                     <label for="{{ form.hidecm.id_for_label }}">{{ form.hidecm }} Allow hiding the connection window from remote screen.</label><br>
             </div>
         
-            <div class="section">
-                <h2><i class="fas fa-paint-brush"></i> Visual</h2>
-                    {{ form.iconbase64.as_hidden }}
-                    {{ form.logobase64.as_hidden }}
-                    {{ form.privacybase64.as_hidden }}
-                    <label for="{{ form.iconfile.id_for_label }}">Custom App Icon (in .png format)</label>
-                    {{ form.iconfile }}<br><br>
-                    <!-- <input type="file" name="iconfile" id="iconfile" accept="image/png"> -->
-                    <div id="icon-preview"></div><br><br>
-                    <label for="{{ form.logofile.id_for_label }}">Custom App Logo (in .png format)</label>
-                    {{ form.logofile }}<br><br>
-                    <!-- <input type="file" name="logofile" id="logofile" accept="image/png"> -->
-                    <div id="logo-preview"></div><br><br>
-                    <label for="{{ form.privacyfile.id_for_label }}">Custom Privacy Screen (in .png format)</label>
-                    {{ form.privacyfile }}<br><br>
-                    <!-- <input type="file" name="iconfile" id="iconfile" accept="image/png"> -->
-                    <div id="privacy-preview"></div><br><br>
-                    <label for="{{ form.theme.id_for_label }}">Theme:</label>
-                    {{ form.theme }} {{ form.themeDorO }} *Default sets the theme but allows the client to change it, Override sets the theme permanently.<br><br>
-            </div>
         </div>
         <div class="container">
             <div class="section">
@@ -381,14 +688,110 @@
                     <label for="{{ form.removeNewVersionNotif.id_for_label }}">{{ form.removeNewVersionNotif }} Disable update notices.</label><br>
             </div>
 
-            <div class="section">
-                <h2><i class="fas fa-cog"></i> Other</h2>
+            <div class="section section--wide">
+                <h2><i class="fas fa-paint-brush"></i> Visual</h2>
+                    {{ form.iconbase64.as_hidden }}
+                    {{ form.logobase64.as_hidden }}
+                    {{ form.privacybase64.as_hidden }}
+                    <div class="visual-grid">
+                        <div class="visual-pane">
+                            <h3><i class="fas fa-image"></i> Branding</h3>
+                            <label for="{{ form.iconfile.id_for_label }}">Custom App Icon (in .png format)</label>
+                            {{ form.iconfile }}<br><br>
+                            <!-- <input type="file" name="iconfile" id="iconfile" accept="image/png"> -->
+                            <div id="icon-preview"></div><br><br>
+                            <label for="{{ form.logofile.id_for_label }}">Custom App Logo (in .png format)</label>
+                            {{ form.logofile }}<br><br>
+                            <!-- <input type="file" name="logofile" id="logofile" accept="image/png"> -->
+                            <div id="logo-preview"></div><br><br>
+                            <label for="{{ form.privacyfile.id_for_label }}">Custom Privacy Screen (in .png format)</label>
+                            {{ form.privacyfile }}<br><br>
+                            <!-- <input type="file" name="iconfile" id="iconfile" accept="image/png"> -->
+                            <div id="privacy-preview"></div><br><br>
+                        </div>
+                        <div class="visual-pane">
+                            <h3><i class="fas fa-palette"></i> Theme</h3>
+                            <label for="{{ form.theme.id_for_label }}">Theme:</label>
+                            {{ form.theme }} {{ form.themeDorO }} *Default sets the theme but allows the client to change it, Override sets the theme permanently.<br><br>
+                            <label>Theme colors <span class="hint">(optional; blank keeps the stock RustDesk color. Flutter clients only &mdash; not the 32-bit Windows/Sciter build.)</span></label>
+                            <div class="theme-colors">
+                                <div class="theme-color">
+                                    <label for="{{ form.themeColor.id_for_label }}">Accent</label>
+                                    <input type="color" value="#0071ff" data-color-for="{{ form.themeColor.id_for_label }}">
+                                    {{ form.themeColor }}
+                                </div>
+                                <div class="theme-color">
+                                    <label for="{{ form.themeSurfaceLight.id_for_label }}">Light surface</label>
+                                    <input type="color" value="#efeff2" data-color-for="{{ form.themeSurfaceLight.id_for_label }}">
+                                    {{ form.themeSurfaceLight }}
+                                </div>
+                                <div class="theme-color">
+                                    <label for="{{ form.themeSurfaceDark.id_for_label }}">Dark surface</label>
+                                    <input type="color" value="#18191e" data-color-for="{{ form.themeSurfaceDark.id_for_label }}">
+                                    {{ form.themeSurfaceDark }}
+                                </div>
+                                <div class="theme-color">
+                                    <label for="{{ form.themeMeColor.id_for_label }}">ID / &ldquo;me&rdquo;</label>
+                                    <input type="color" value="#21790b" data-color-for="{{ form.themeMeColor.id_for_label }}">
+                                    {{ form.themeMeColor }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="visual-pane">
+                            <h3><i class="fas fa-eye"></i> Client preview</h3>
+                            <div class="theme-live">
+                                <div class="theme-live-bar">
+                                    <button type="button" data-tp-mode="light">light</button>
+                                    <button type="button" data-tp-mode="dark">dark</button>
+                                </div>
+                                <div class="theme-live-window" id="theme-live" data-mode="dark">
+                                    <div class="tp-title">
+                                        <span class="tp-dot"></span>
+                                        <span id="tp-app">App</span>
+                                    </div>
+                                    <div class="tp-body">
+                                        <div class="tp-card">
+                                            <div class="tp-id">1 234 567</div>
+                                            <div class="tp-sub">ready to connect</div>
+                                            <button type="button" class="tp-btn">Connect</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="theme-live-hint">Approximate preview. The selected colors are compiled into the client at build time.</p>
+                            </div>
+                        </div>
+                    </div>
+            </div>
+
+            <div class="section section--wide" id="advanced-settings">
+                <h2><i class="fas fa-cog"></i> Other &amp; advanced settings</h2>
                     <label for="{{ form.removeWallpaper.id_for_label }}">{{ form.removeWallpaper }} Remove wallpaper during incoming sessions</label><br>
-                    <a href="https://rustdesk.com/docs/en/self-host/client-configuration/advanced-settings/">Click here for a list of Default/Override settings</a>
-                    <label for="{{ form.defaultManual.id_for_label }}">Default settings</label><br>
-                    {{ form.defaultManual }}<br><br>
-                    <label for="{{ form.overrideManual.id_for_label }}">Override settings</label><br>
-                    {{ form.overrideManual }}<br><br>
+                    <p class="theme-live-hint">
+                        Official RustDesk <code>key=value</code> lines.
+                        <strong>Default</strong> = first-run value, the user can still change it if Settings stay allowed.
+                        <strong>Override</strong> = locked.
+                        Search or click a key to insert a ready line, then edit its value in the box.
+                        Keys already set by the form above are tagged.
+                        <a href="https://rustdesk.com/docs/en/self-host/client-configuration/advanced-settings/" target="_blank" rel="noopener">Full docs</a>
+                    </p>
+                    <div class="adv-toolbar">
+                        <input type="search" id="adv-search" placeholder="Search keys - tray, password, whitelist..." spellcheck="false" autocomplete="off" aria-label="Search advanced settings keys">
+                        <div class="adv-filters" role="group" aria-label="Filter advanced settings keys">
+                            <button type="button" class="is-on" data-adv-filter="all">All</button>
+                            <button type="button" data-adv-filter="useful">Suggested</button>
+                            <button type="button" data-adv-filter="owned">On this form</button>
+                        </div>
+                    </div>
+                    <p class="adv-note" id="adv-note" aria-live="polite"></p>
+                    <div class="adv-wrap">
+                        <div class="adv-catalog" id="adv-list" role="list" aria-label="RustDesk advanced settings keys"></div>
+                        <div class="adv-boxes">
+                            <label for="{{ form.defaultManual.id_for_label }}">Default settings</label>
+                            {{ form.defaultManual }}
+                            <label for="{{ form.overrideManual.id_for_label }}">Override settings <span class="hint">(locked, highest priority)</span></label>
+                            {{ form.overrideManual }}
+                        </div>
+                    </div>
             </div>
         </div>
         <div class="platform">
@@ -413,6 +816,7 @@
             </a>
         </div>
     </form>
+    {{ advanced_keys|json_script:"advanced-keys-data" }}
     <script>
         document.querySelectorAll('.platform-icon').forEach(icon => {
             icon.addEventListener('click', function() {
@@ -743,6 +1147,15 @@
                                 }
                             }
                             showLoadWarnings(skippedKeys);
+                            document.querySelectorAll('input[type="color"][data-color-for]').forEach(syncThemeColorFromText);
+                            const loadedTheme = document.getElementById('id_theme');
+                            const previewWin = document.getElementById('theme-live');
+                            if (previewWin && loadedTheme &&
+                                (loadedTheme.value === 'light' || loadedTheme.value === 'dark')) {
+                                previewWin.dataset.mode = loadedTheme.value;
+                            }
+                            updateThemeLive();
+                            renderAdvList();
                         } catch (error) {
                             alert("Error loading data. Invalid JSON file.");
                         }
@@ -751,6 +1164,251 @@
                 }
             });
         }
+        // ── Advanced settings key picker ───────────────────────────────
+        // The catalog comes from advanced_keys.py (official RustDesk docs).
+        // A row inserts "key=sample" into the Default or Override textarea,
+        // replacing any existing line for that key, where the value stays
+        // editable. The textareas remain the submitted source of truth.
+        const ADVANCED_KEYS = (function () {
+            const el = document.getElementById('advanced-keys-data');
+            if (!el) return [];
+            try {
+                return JSON.parse(el.textContent) || [];
+            } catch (err) {
+                console.warn('advanced settings catalog did not parse', err);
+                return [];
+            }
+        })();
+        let advFilter = 'all';
+
+        function advEsc(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+            });
+        }
+
+        function advTextarea(which) {
+            const id = which === 'override' ? 'id_overrideManual' : 'id_defaultManual';
+            return document.getElementById(id);
+        }
+
+        function advPin() {
+            const el = document.getElementById('id_version');
+            return (el && el.value.trim()) || '';
+        }
+
+        // Version-gated keys are still listed, but marked as ignored by the
+        // selected build. Branch builds ("master") are treated as newest.
+        function advVersionNewer(min) {
+            if (!min) return false;
+            const pin = advPin();
+            if (!pin || !/^\d/.test(pin)) return false;
+            const wanted = String(min).split('.').map(function (n) {
+                return parseInt(n, 10) || 0;
+            });
+            const build = pin.split('.').map(function (n) {
+                return parseInt(n, 10) || 0;
+            });
+            for (let i = 0; i < 3; i++) {
+                if ((wanted[i] || 0) > (build[i] || 0)) return true;
+                if ((wanted[i] || 0) < (build[i] || 0)) return false;
+            }
+            return false;
+        }
+
+        function advNote(msg, bad) {
+            const el = document.getElementById('adv-note');
+            if (!el) return;
+            el.textContent = msg || '';
+            el.classList.toggle('is-bad', !!bad);
+        }
+
+        // Keys already present in either box, used for the "in default" /
+        // "in override" badges and for replacing instead of duplicating.
+        function advPlacedKeys() {
+            const both = { 'default': {}, 'override': {} };
+            ['default', 'override'].forEach(function (which) {
+                const ta = advTextarea(which);
+                if (!ta) return;
+                String(ta.value || '').split(/\r?\n/).forEach(function (raw) {
+                    const line = raw.trim();
+                    const eq = line.indexOf('=');
+                    if (eq < 1) return;
+                    const key = line.slice(0, eq).trim();
+                    if (key) both[which][key] = true;
+                });
+            });
+            return both;
+        }
+
+        function advInsert(item, which) {
+            const ta = advTextarea(which);
+            if (!ta) return;
+            const target = which === 'override' ? 'Override' : 'Default';
+            const sample = item.sample == null ? '' : item.sample;
+            const line = item.key + '=' + sample;
+            const kept = [];
+            let found = false;
+
+            String(ta.value || '').split(/\r?\n/).forEach(function (raw) {
+                const trimmed = raw.trim();
+                const eq = trimmed.indexOf('=');
+                const key = eq > 0 ? trimmed.slice(0, eq).trim() : '';
+                if (key === item.key) {
+                    // Keep the first occurrence in its place; drop duplicates.
+                    if (!found) {
+                        kept.push(line);
+                        found = true;
+                    }
+                } else {
+                    kept.push(raw.replace(/\s+$/, ''));
+                }
+            });
+            if (!found) kept.push(line);
+            while (kept.length && !kept[0].trim()) kept.shift();
+            while (kept.length && !kept[kept.length - 1].trim()) kept.pop();
+
+            ta.value = kept.join('\n') + (kept.length ? '\n' : '');
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+            ta.focus();
+            if (ta.setSelectionRange) {
+                const end = ta.value.length;
+                ta.setSelectionRange(end, end);
+            }
+
+            if (advVersionNewer(item.min)) {
+                advNote(item.key + ' needs RustDesk ' + item.min + '. This build is '
+                    + advPin() + ' - the client will ignore it.', true);
+            } else if (item.owned) {
+                advNote(item.key + ' is already set by the ' + item.owned
+                    + ' section above. Inserting it here overwrites that value in '
+                    + target + ' settings.');
+            } else {
+                advNote(item.key + ' inserted into ' + target + ' settings.');
+            }
+        }
+
+        function renderAdvList() {
+            const host = document.getElementById('adv-list');
+            if (!host) return;
+            const scrollTop = host.scrollTop;
+            const search = document.getElementById('adv-search');
+            const query = String((search && search.value) || '').trim().toLowerCase();
+            const placed = advPlacedKeys();
+            const groups = [];
+            let lastGroup = '';
+            let count = 0;
+
+            ADVANCED_KEYS.forEach(function (item) {
+                if (advFilter === 'useful' && !item.useful) return;
+                if (advFilter === 'owned' && !item.owned) return;
+                if (query) {
+                    const blob = [item.key, item.hint, item.group, item.values,
+                        item.owned || '', item.default || ''].join(' ').toLowerCase();
+                    if (!blob.includes(query)) return;
+                }
+
+                if (item.group !== lastGroup) {
+                    groups.push('<div class="adv-group">' + advEsc(item.group) + '</div>');
+                    lastGroup = item.group;
+                }
+
+                const future = advVersionNewer(item.min);
+                const inDefault = !!placed['default'][item.key];
+                const inOverride = !!placed['override'][item.key];
+                const where = inDefault ? 'default' : (inOverride ? 'override' : '');
+                const cls = [
+                    'adv-row',
+                    item.owned ? 'is-owned' : '',
+                    future ? 'is-future' : '',
+                    where ? 'is-in' : '',
+                ].filter(Boolean).join(' ');
+
+                const badges = [];
+                if (item.useful) badges.push('<span class="adv-badge useful">suggested</span>');
+                if (item.owned) badges.push('<span class="adv-badge owned">' + advEsc(item.owned) + '</span>');
+                if (item.pro) badges.push('<span class="adv-badge">Pro</span>');
+                if (future) badges.push('<span class="adv-badge future">' + advEsc(item.min) + '+</span>');
+                else if (item.min) badges.push('<span class="adv-badge">since ' + advEsc(item.min) + '</span>');
+                if (where) badges.push('<span class="adv-badge placed">in ' + where + '</span>');
+
+                const values = item.values
+                    ? ' <span class="adv-vals">' + advEsc(item.values) + '</span>'
+                    : '';
+                const def = item.default
+                    ? ' <span class="adv-vals">&middot; default ' + advEsc(item.default) + '</span>'
+                    : '';
+
+                groups.push(
+                    '<div class="' + cls + '" data-adv-key="' + advEsc(item.key) + '" role="listitem">'
+                    + '<span class="adv-k">' + advEsc(item.key) + '</span>'
+                    + '<span class="adv-badges">' + badges.join('') + '</span>'
+                    + '<span class="adv-meta">' + advEsc(item.hint) + values + def + '</span>'
+                    + '<span class="adv-insert">'
+                    + '<button type="button" data-adv-into="default">Default</button>'
+                    + '<button type="button" data-adv-into="override">Override</button>'
+                    + '</span></div>'
+                );
+                count++;
+            });
+
+            host.innerHTML = count
+                ? groups.join('')
+                : '<div class="adv-empty">No keys match that search.</div>';
+            host.scrollTop = scrollTop;
+        }
+
+        (function initAdvancedKeys() {
+            if (!ADVANCED_KEYS.length) return;
+            const search = document.getElementById('adv-search');
+            if (search) {
+                search.addEventListener('input', renderAdvList);
+                // Enter in a search box would otherwise submit the generator form.
+                search.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') e.preventDefault();
+                });
+            }
+
+            const version = document.getElementById('id_version');
+            if (version) version.addEventListener('change', renderAdvList);
+
+            document.querySelectorAll('[data-adv-filter]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    advFilter = btn.dataset.advFilter || 'all';
+                    document.querySelectorAll('[data-adv-filter]').forEach(function (other) {
+                        other.classList.toggle('is-on', other === btn);
+                    });
+                    renderAdvList();
+                });
+            });
+
+            const list = document.getElementById('adv-list');
+            if (list) {
+                list.addEventListener('click', function (e) {
+                    const btn = e.target.closest('[data-adv-into]');
+                    if (!btn) return;
+                    const row = btn.closest('[data-adv-key]');
+                    if (!row) return;
+                    const item = ADVANCED_KEYS.find(function (entry) {
+                        return entry.key === row.dataset.advKey;
+                    });
+                    if (item) advInsert(item, btn.dataset.advInto);
+                });
+            }
+
+            // Keep the badges in step with hand edits and loaded configs.
+            ['id_defaultManual', 'id_overrideManual'].forEach(function (id) {
+                const ta = document.getElementById(id);
+                if (!ta) return;
+                ta.addEventListener('input', renderAdvList);
+                ta.addEventListener('focus', function () {
+                    advNote('Editing ' + (id === 'id_overrideManual' ? 'Override' : 'Default')
+                        + ' settings. Pick a key above to insert it here.');
+                });
+            });
+
+            renderAdvList();
+        })();
     </script>
 </body>
 </html>

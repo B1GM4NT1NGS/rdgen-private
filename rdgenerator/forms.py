@@ -1,3 +1,4 @@
+import logging
 import re
 
 from django import forms
@@ -65,10 +66,13 @@ def env_bool(name, default=False):
     return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+logger = logging.getLogger(__name__)
+
 # App/company names are interpolated into single/double-quoted bash sed
 # scripts in every generator workflow: & \ | corrupt the substitution
 # silently, ' " $ ` break shell quoting, CR/LF break sed addressing.
 UNSAFE_NAME_CHARS = re.compile(r'[&\\|\'"$`\r\n]')
+HEX_COLOR_RE = re.compile(r'^#?[0-9A-Fa-f]{6}$')
 
 class GenerateForm(forms.Form):
     sh_secret_field = forms.CharField(required=False)
@@ -118,6 +122,32 @@ class GenerateForm(forms.Form):
         ('system', 'Follow System')
     ], initial='system')
     themeDorO = forms.ChoiceField(choices=[('default', 'Default'),('override', 'Override')], initial='default')
+    # Blank = keep the stock RustDesk colour. The workflows apply these to the
+    # Flutter theme via .github/patches/themeColors.py.
+    themeColor = forms.CharField(
+        label="Accent color", required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': '#0071FF (stock)', 'class': 'hex-color',
+            'spellcheck': 'false', 'autocomplete': 'off',
+        }))
+    themeSurfaceLight = forms.CharField(
+        label="Light surface color", required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': '#EFEFF2 (stock)', 'class': 'hex-color',
+            'spellcheck': 'false', 'autocomplete': 'off',
+        }))
+    themeSurfaceDark = forms.CharField(
+        label="Dark surface color", required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': '#18191E (stock)', 'class': 'hex-color',
+            'spellcheck': 'false', 'autocomplete': 'off',
+        }))
+    themeMeColor = forms.CharField(
+        label="ID / \u201cme\u201d color", required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': '#21790B (stock)', 'class': 'hex-color',
+            'spellcheck': 'false', 'autocomplete': 'off',
+        }))
 
     #Security
     passApproveMode = forms.ChoiceField(choices=[
@@ -189,7 +219,7 @@ class GenerateForm(forms.Form):
         self.fields['removeNewVersionNotif'].initial = env_bool('RDGEN_DEFAULT_HIDE_NEW_VERSION_NOTICE', False)
 
     def clean_iconfile(self):
-        print("checking icon")
+        logger.info("checking icon")
         image = self.cleaned_data['iconfile']
         if image:
             try:
@@ -227,3 +257,27 @@ class GenerateForm(forms.Form):
 
     def clean_compname(self):
         return self._reject_unsafe_name_chars('compname')
+
+    def _clean_hex_color(self, field):
+        """Accept #RRGGBB or RRGGBB; return canonical #RRGGBB or ''."""
+        value = (self.cleaned_data.get(field) or '').strip()
+        if not value:
+            return ''
+        if not HEX_COLOR_RE.match(value):
+            raise forms.ValidationError(
+                "Enter a 6-digit hex color such as #0071FF, or leave it blank "
+                "for the stock RustDesk color."
+            )
+        return '#' + value.lstrip('#').upper()
+
+    def clean_themeColor(self):
+        return self._clean_hex_color('themeColor')
+
+    def clean_themeSurfaceLight(self):
+        return self._clean_hex_color('themeSurfaceLight')
+
+    def clean_themeSurfaceDark(self):
+        return self._clean_hex_color('themeSurfaceDark')
+
+    def clean_themeMeColor(self):
+        return self._clean_hex_color('themeMeColor')

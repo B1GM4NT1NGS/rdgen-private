@@ -3,7 +3,8 @@ import os
 import re
 from django.http import JsonResponse
 from django.conf import settings as _settings
-from .views import generate_custom_client, _get_run_status, _UUID_RE
+from .forms import GenerateForm
+from .views import generate_custom_client, _get_run_status, _UUID_RE, _norm_hex_color, THEME_COLOR_FIELDS
 
 
 # Field validation constraints (mirrored from GenerateForm)
@@ -35,6 +36,7 @@ OPTIONAL_STR_FIELDS = [
     'iconbase64', 'logobase64', 'privacybase64',
     'update_public_key',
     'app_version',
+    *THEME_COLOR_FIELDS,
 ]
 
 
@@ -106,6 +108,14 @@ def validate_generate_params(data):
                 'Contains characters unsupported in build scripts '
                 '(& \\ | \' " $ `, newlines).'
             )
+
+    for field in THEME_COLOR_FIELDS:
+        value = cleaned.get(field, '')
+        normalized = _norm_hex_color(value)
+        if value and not normalized:
+            errors[field] = 'Enter a 6-digit hex color or leave it blank.'
+        else:
+            cleaned[field] = normalized
 
     # File fields are not used in API mode (base64 fields are used instead)
     cleaned['iconfile'] = None

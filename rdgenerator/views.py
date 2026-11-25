@@ -1,4 +1,5 @@
 import io
+import logging
 from pathlib import Path
 from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404
@@ -13,10 +14,20 @@ import uuid
 import pyzipper
 from django.conf import settings as _settings
 from django.db.models import Q
-from .forms import GenerateForm
+from .forms import GenerateForm, HEX_COLOR_RE
+from .advanced_keys import ADVANCED_KEYS
 from .models import GithubRun
 from PIL import Image
 from urllib.parse import quote
+
+logger = logging.getLogger(__name__)
+
+THEME_COLOR_FIELDS = ('themeColor', 'themeSurfaceLight', 'themeSurfaceDark', 'themeMeColor')
+
+
+def _norm_hex_color(value):
+    value = value.strip() if isinstance(value, str) else ''
+    return '#' + value.lstrip('#').upper() if HEX_COLOR_RE.fullmatch(value) else ''
 
 def env_default(name, fallback=""):
     return (os.environ.get(name) or fallback or "").strip()
@@ -204,7 +215,7 @@ def generate_custom_client(params, full_url):
             iconfile = params.get('iconbase64')
         iconlink_url, iconlink_uuid, iconlink_file = save_png(iconfile,myuuid,full_url,"icon.png")
     except:
-        print("failed to get icon, using default")
+        logger.info("failed to get icon, using default")
         iconlink_url = "false"
         iconlink_uuid = "false"
         iconlink_file = "false"
@@ -214,7 +225,7 @@ def generate_custom_client(params, full_url):
             logofile = params.get('logobase64')
         logolink_url, logolink_uuid, logolink_file = save_png(logofile,myuuid,full_url,"logo.png")
     except:
-        print("failed to get logo")
+        logger.info("failed to get logo")
         logolink_url = "false"
         logolink_uuid = "false"
         logolink_file = "false"
@@ -224,7 +235,7 @@ def generate_custom_client(params, full_url):
             privacyfile = params.get('privacybase64')
         privacylink_url, privacylink_uuid, privacylink_file = save_png(privacyfile,myuuid,full_url,"privacy.png")
     except:
-        print("failed to get logo")
+        logger.info("failed to get privacy screen")
         privacylink_url = "false"
         privacylink_uuid = "false"
         privacylink_file = "false"
@@ -357,6 +368,7 @@ def generate_custom_client(params, full_url):
         "privacylink_file":privacylink_file,
         "appname":appname,
         "genurl":_settings.GENURL,
+        **{field: _norm_hex_color(params.get(field)) for field in THEME_COLOR_FIELDS},
         "urlLink":urlLink,
         "downloadLink":downloadLink,
         "backupitUpdateManifest": backupitUpdateManifest,
@@ -416,7 +428,7 @@ def generate_custom_client(params, full_url):
         response = requests.post(url, json=data, headers=headers)
         if response.status_code == 204 or response.status_code == 200:
             github_data = response.json()
-            print(github_data)
+            logger.info("%s", github_data)
             new_github_run.github_run_id = github_data.get('workflow_run_id')
             new_github_run.status = "in_progress"
             new_github_run.save()
@@ -507,7 +519,7 @@ def _get_run_status(uuid_val):
                     gh_run.status = gh_data['conclusion']
                     gh_run.save()
         except Exception as e:
-            print(f"Error checking GitHub: {e}")
+            logger.warning(f"Error checking GitHub: {e}")
 
     return {
         "found": True,
@@ -537,7 +549,10 @@ def generator_view(request):
     else:
         form = GenerateForm()
     #return render(request, 'maintenance.html')
-    return render(request, 'generator.html', {'form': form})
+    return render(request, 'generator.html', {
+        'form': form,
+        'advanced_keys': ADVANCED_KEYS,
+    })
 
 
 def _expected_files_for_platform(filename, platform):
@@ -556,7 +571,6 @@ def _expected_files_for_platform(filename, platform):
             f"{filename}-aarch64.deb",
             f"{filename}-aarch64.rpm",
             f"{filename}-suse-aarch64.rpm",
-            f"{filename}-aarch64.pkg.tar.zst",
             f"{filename}-x86_64.AppImage",
             f"{filename}-aarch64.AppImage",
             f"{filename}-x86_64.flatpak",
@@ -736,7 +750,7 @@ def startgh(request):
         'X-GitHub-Api-Version': '2026-03-10'
     }
     response = requests.post(url, json=data, headers=headers)
-    print(response)
+    logger.info("%s", response)
     return HttpResponse(status=204)
 
 def save_png(file, uuid, domain, name):
@@ -749,10 +763,10 @@ def save_png(file, uuid, domain, name):
             decoded_img = base64.b64decode(encoded)
             file = ContentFile(decoded_img, name=name) # Create a file-like object
         except ValueError:
-            print("Invalid base64 data")
+            logger.info("Invalid base64 data")
             return None  # Or handle the error as you see fit
         except Exception as e:  # Catch general exceptions during decoding
-            print(f"Error decoding base64: {e}")
+            logger.warning(f"Error decoding base64: {e}")
             return None
         
     with open(file_save_path, "wb+") as f:
@@ -795,9 +809,9 @@ def cleanup_secrets(request):
             file_path = os.path.join(temp_dir, filename)
             try:
                 os.remove(file_path)
-                print(f"Successfully deleted {file_path}")
+                logger.info(f"Successfully deleted {file_path}")
             except OSError as e:
-                print(f"Error deleting file: {e}")
+                logger.warning(f"Error deleting file: {e}")
 
     return HttpResponse("Cleanup successful", status=200)
 
