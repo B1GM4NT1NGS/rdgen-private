@@ -64,7 +64,7 @@ pub(crate) fn pilot_endpoint() -> String {{
                 return endpoint;
             }}
         }}
-        }} else if let Some((endpoint, _)) = local_update_grant() {{
+        }} else if let Some((endpoint, _)) = local_update_grant(false) {{
             return endpoint;
         }}
     }}
@@ -72,7 +72,7 @@ pub(crate) fn pilot_endpoint() -> String {{
 }}
 
 #[cfg(target_os = "windows")]
-fn local_update_grant() -> Option<(String, String)> {{
+fn local_update_grant(require_live: bool) -> Option<(String, String)> {{
     use std::io::Read;
     let path = std::path::PathBuf::from(std::env::var_os("LOCALAPPDATA")?)
         .join("BackupIT-UpdateAccess").join("update-access.json");
@@ -83,7 +83,7 @@ fn local_update_grant() -> Option<(String, String)> {{
     let endpoint = grant.get("endpoint")?.as_str()?;
     let token = grant.get("token")?.as_str()?;
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
-    if grant.get("channel")?.as_str()? != CHANNEL || grant.get("expires")?.as_u64()? <= now
+    if grant.get("channel")?.as_str()? != CHANNEL || (require_live && grant.get("expires")?.as_u64()? <= now)
         || !lower_hex(token, 64)
         || !endpoint.strip_prefix(ORIGIN).and_then(|url| url.strip_suffix("/index.php"))
             .is_some_and(|directory| lower_hex(directory, 24)) {{ return None; }}
@@ -91,15 +91,15 @@ fn local_update_grant() -> Option<(String, String)> {{
 }}
 
 #[cfg(not(target_os = "windows"))]
-fn local_update_grant() -> Option<(String, String)> {{ None }}
+fn local_update_grant(_require_live: bool) -> Option<(String, String)> {{ None }}
 
 pub(crate) fn pilot_token() -> Option<String> {{
     std::env::var("BACKUPIT_PILOT_TOKEN").ok().filter(|value| lower_hex(value, 64))
-        .or_else(|| if RUNTIME_ENDPOINT {{ local_update_grant().map(|(_, token)| token) }} else {{ None }})
+        .or_else(|| if RUNTIME_ENDPOINT {{ local_update_grant(true).map(|(_, token)| token) }} else {{ None }})
 }}
 
 pub(crate) fn pilot_latest(format: &str) -> ResultType<Option<Release>> {{
-    let token = pilot_token().ok_or_else(|| hbb_common::anyhow::anyhow!("No valid BackupIT update grant"))?;
+    let token = pilot_token().ok_or_else(|| hbb_common::anyhow::anyhow!("BackupIT update access is missing or expired"))?;
     let installed = if INSTALLED_VERSION.is_empty() {{
         std::env::var("BACKUPIT_PILOT_INSTALLED_VERSION")?
     }} else {{
