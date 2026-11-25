@@ -75,7 +75,7 @@ pub(crate) fn pilot_endpoint() -> String {{
 fn local_update_grant() -> Option<(String, String)> {{
     use std::io::Read;
     let path = std::path::PathBuf::from(std::env::var_os("LOCALAPPDATA")?)
-        .join("BackupIT").join("update-access.json");
+        .join("BackupIT-UpdateAccess").join("update-access.json");
     let mut bytes = Vec::new();
     std::fs::File::open(path).ok()?.take(4097).read_to_end(&mut bytes).ok()?;
     if bytes.len() > 4096 {{ return None; }}
