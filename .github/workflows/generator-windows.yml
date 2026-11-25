@@ -21,6 +21,9 @@ on:
       signed_update_pilot:
         type: boolean
         default: false
+      signed_update_embed_password:
+        type: boolean
+        default: false
       signed_update_public_key:
         type: string
         default: ''
@@ -398,18 +401,19 @@ jobs:
           Invoke-WebRequest -Headers @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"} -Uri "https://api.github.com/repos/${{ github.repository }}/contents/.github/patches/backupit_hwid.py?ref=${{ github.ref_name }}" -OutFile backupit_hwid.py
           python backupit_hwid.py
 
-      - name: Apply signed AskOnly updater
+      - name: Apply signed BackupIT updater
         if: inputs.signed_update_pilot
         shell: pwsh
         env:
           BACKUPIT_PILOT_ENDPOINT: https://backupit.co.uk/000000000000000000000000/index.php
           BACKUPIT_PILOT_ALLOW_RUNTIME_ENDPOINT: '1'
           BACKUPIT_PILOT_BRANDED: '1'
+          BACKUPIT_ALLOW_EMBEDDED_PASSWORD: ${{ inputs.signed_update_embed_password }}
           BACKUPIT_PILOT_PUBLIC_KEY: ${{ inputs.signed_update_public_key }}
           BACKUPIT_PILOT_BUILD_VERSION: ${{ inputs.signed_update_installed_version }}
         run: |
-          if ($env:VERSION -ne '1.5.3' -or $env:backupitUpdateChannel -cne 'windows-ask-only' -or !$env:uuid -or !$env:BACKUPIT_PILOT_BUILD_VERSION) {
-            throw 'Signed updater staging requires a versioned AskOnly 1.5.3 build'
+          if ($env:VERSION -ne '1.5.3' -or $env:backupitUpdateChannel -cnotin @('windows','windows-admin','windows-ask-only','windows-ask-pass') -or !$env:uuid -or !$env:BACKUPIT_PILOT_BUILD_VERSION) {
+            throw 'Signed updater staging requires a versioned Windows x64 1.5.3 build'
           }
           $env:BACKUPIT_PILOT_CHANNEL = $env:backupitUpdateChannel
           $headers = @{Authorization="Bearer ${{ github.token }}"; Accept="application/vnd.github.raw"}
@@ -728,7 +732,7 @@ jobs:
       - name: Create custom.txt file
         shell: bash
         run: |
-          echo -n "${{ env.custom }}" | cat > ./rustdesk/custom_.txt
+          printf '%s' "$custom" > ./rustdesk/custom_.txt
 
       - name: Build self-extracted executable
         shell: bash

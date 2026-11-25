@@ -10,14 +10,14 @@ import re
 FIXTURE_KEY = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
 
 
-def validate_branded_pilot(encoded):
+def validate_branded_pilot(encoded, *, allow_embedded_password=False):
     config = json.loads(base64.b64decode(encoded, validate=True))
     if not isinstance(config, dict) or not config.get("app-name"):
         raise ValueError("Branded pilot needs a named custom configuration")
     if not re.fullmatch(r"[A-Za-z0-9_-]+", config["app-name"]):
         raise ValueError("Windows pilot app name may contain only letters, numbers, hyphens and underscores")
-    if config.get("password"):
-        raise ValueError("A branded updater pilot must not embed a connection password")
+    if config.get("password") and not allow_embedded_password:
+        raise ValueError("An embedded connection password requires explicit build opt-in")
 
 
 def replace(text, old, new):
@@ -205,7 +205,7 @@ pub(crate) fn pilot_package_name(url: &str) -> Option<&str> {{
 
 if __name__ == "__main__":
     if os.environ.get("BACKUPIT_PILOT_BRANDED") == "1":
-        validate_branded_pilot(os.environ["custom"])
+        validate_branded_pilot(os.environ["custom"], allow_embedded_password=os.environ.get("BACKUPIT_ALLOW_EMBEDDED_PASSWORD") == "true")
     patch(Path.cwd(), os.environ["BACKUPIT_PILOT_ENDPOINT"], os.environ["BACKUPIT_PILOT_CHANNEL"],
           os.environ["BACKUPIT_PILOT_PUBLIC_KEY"], os.environ.get("BACKUPIT_PILOT_BUILD_ID", os.environ.get("uuid", "")),
           os.environ.get("BACKUPIT_PILOT_ALLOW_RUNTIME_ENDPOINT") == "1",

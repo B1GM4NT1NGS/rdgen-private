@@ -364,12 +364,14 @@ def generate_custom_client(params, full_url):
         release = env_default('RDGEN_SIGNED_UPDATE_BUILD_VERSION')
         if (_settings.GHBRANCH != 'backupit/rdgen-upstream-review-20261125'
                 or workflow_file != 'generator-windows.yml' or version != '1.5.3'
-                or update_channel != 'windows-ask-only' or permPass or app_version
+                or update_channel not in {'windows', 'windows-admin', 'windows-ask-only', 'windows-ask-pass'} or app_version
                 or not re.fullmatch(r'[a-f0-9]{64}', verification_key)
                 or not re.fullmatch(r'BackupIT-\d{4}\.\d{2}\.\d{2}\.\d{1,9}', release)):
-            return {'error': 'Signed updater staging requires a password-free AskOnly 1.5.3 build', 'status_code': 400}
+            return {'error': 'Signed updater staging requires a versioned Windows x64 1.5.3 build', 'status_code': 400}
+        if permPass and env_default('RDGEN_SIGNED_UPDATE_ALLOW_EMBEDDED_PASSWORD') != '1':
+            return {'error': 'An embedded connection password requires explicit build opt-in', 'status_code': 400}
         signed_inputs = {'signed_update_pilot': True, 'signed_update_public_key': verification_key,
-                         'signed_update_installed_version': release}
+                         'signed_update_installed_version': release, 'signed_update_embed_password': bool(permPass)}
     url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/'+workflow_file+'/dispatches'
 
     inputs_raw = {
