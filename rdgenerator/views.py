@@ -348,6 +348,18 @@ def generate_custom_client(params, full_url):
     workflow_file = workflows.get(workflow_platform, workflows['windows'])
     if workflow_platform == 'windows' and selfhosted:
         workflow_file = 'sh-generator-windows.yml'
+    signed_inputs = {}
+    if env_default('RDGEN_SIGNED_UPDATE_PILOT') == '1':
+        verification_key = env_default('RDGEN_SIGNED_UPDATE_PUBLIC_KEY')
+        release = env_default('RDGEN_SIGNED_UPDATE_BUILD_VERSION')
+        if (_settings.GHBRANCH != 'backupit/rdgen-upstream-review-20261125'
+                or workflow_file != 'generator-windows.yml' or version != '1.5.3'
+                or update_channel != 'windows-ask-only' or permPass or app_version
+                or not re.fullmatch(r'[a-f0-9]{64}', verification_key)
+                or not re.fullmatch(r'BackupIT-\d{4}\.\d{2}\.\d{2}\.\d{1,9}', release)):
+            return {'error': 'Signed updater staging requires a password-free AskOnly 1.5.3 build', 'status_code': 400}
+        signed_inputs = {'signed_update_pilot': True, 'signed_update_public_key': verification_key,
+                         'signed_update_installed_version': release}
     url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/'+workflow_file+'/dispatches'
 
     inputs_raw = {
@@ -410,7 +422,8 @@ def generate_custom_client(params, full_url):
         "inputs":{
             "version":version,
             "app_version":app_version,
-            "zip_url":zip_url
+            "zip_url":zip_url,
+            **signed_inputs,
         },
         "return_run_details": True
     } 
