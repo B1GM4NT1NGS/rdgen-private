@@ -318,6 +318,16 @@ def generate_custom_client(params, full_url):
         decodedCustom['override-settings']['approve-mode'] = 'password'
         decodedCustom['override-settings']['allow-hide-cm'] = 'Y'
 
+    if env_default('RDGEN_SIGNED_UPDATE_PILOT') == '1':
+        # The signed migration build must not depend on implicit relay discovery.
+        decodedCustom['override-settings'].update({
+            'custom-rendezvous-server': server,
+            'relay-server': server,
+            'api-server': apiServer,
+        })
+        if key:
+            decodedCustom['override-settings']['key'] = key
+
     if defaultManual:
         for line in defaultManual.splitlines():
             if '=' in line:
