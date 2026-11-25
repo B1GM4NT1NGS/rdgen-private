@@ -569,6 +569,15 @@ jobs:
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./flutter/lib/mobile/pages/connection_page.dart
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./src/ui/index.tis
 
+      - name: Apply custom theme colors
+        if: env.themeColor != '' || env.themeSurfaceLight != '' || env.themeSurfaceDark != '' || env.themeMeColor != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -H 'Accept: application/vnd.github.raw+json' "repos/${{ github.repository }}/contents/.github/patches/themeColors.py?ref=${{ github.sha }}" > themeColors.py
+          python3 themeColors.py
+
       - name: allow custom.txt
         uses: nick-fields/retry@v4
         with:
